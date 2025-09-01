@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import configparser
 import os
+import getpass
 
 
 def format_timestamp(timestamp_str):
@@ -111,8 +112,8 @@ def process_log_line(line):
     return None
 
 
-def generate_output_filename(input_file, output_directory):
-    """出力ファイル名を生成（JST時刻使用）"""
+def generate_output_filename(input_file, output_directory, username=None):
+    """出力ファイル名を生成（ユーザー名_日付形式）"""
     # ファイルの更新時刻を取得（UTC）
     mod_time_utc = datetime.fromtimestamp(input_file.stat().st_mtime, tz=timezone.utc)
     
@@ -120,8 +121,15 @@ def generate_output_filename(input_file, output_directory):
     jst = timezone(timedelta(hours=9))
     mod_time_jst = mod_time_utc.astimezone(jst)
     
+    # ユーザー名を取得（指定されていない場合は端末ユーザー名）
+    if username is None:
+        try:
+            username = getpass.getuser()
+        except Exception:
+            username = "unknown"
+    
     timestamp = mod_time_jst.strftime('%Y%m%d%H%M%S')
-    filename = f"log_{timestamp}_{input_file.stem}.md"
+    filename = f"log_{username}_{timestamp}_{input_file.stem}.md"
     return output_directory / filename
 
 
@@ -181,6 +189,9 @@ def convert_log_to_markdown(input_file, output_file=None):
     if not messages:
         print("変換可能なメッセージが見つかりませんでした")
         return False
+    
+    # 出力ディレクトリが存在しない場合は作成
+    output_file.parent.mkdir(parents=True, exist_ok=True)
     
     # Markdownファイルを生成
     try:
@@ -242,6 +253,7 @@ class Config:
         self.config['DEFAULT'] = {
             'log_directory': '',  # 空の場合は自動検索
             'output_directory': '',  # 空の場合は作業ディレクトリ
+            'username': '',  # 空の場合は端末ユーザー名
             'max_files': '10',
             'skip_unchanged': 'true'
         }
@@ -274,6 +286,16 @@ class Config:
     def get_skip_unchanged(self):
         """未変更スキップ設定を取得"""
         return self.config.getboolean('DEFAULT', 'skip_unchanged', fallback=True)
+    
+    def get_username(self):
+        """ユーザー名設定を取得"""
+        username = self.config.get('DEFAULT', 'username', fallback='')
+        if username:
+            return username
+        try:
+            return getpass.getuser()
+        except Exception:
+            return "unknown"
 
 
 def find_log_files(log_directory=None):
@@ -331,7 +353,7 @@ def select_log_file(files):
             return None
 
 
-def process_multiple_files(files, config, processed_info, info_file):
+def process_multiple_files(files, config, processed_info, info_file, username=None):
     """複数ファイルを一括処理"""
     processed_count = 0
     skipped_count = 0
@@ -339,13 +361,17 @@ def process_multiple_files(files, config, processed_info, info_file):
     output_directory = config.get_output_directory()
     skip_unchanged = config.get_skip_unchanged()
     
+    # ユーザー名が指定されていない場合は設定から取得
+    if username is None:
+        username = config.get_username()
+    
     for file in files:
         if skip_unchanged and not should_process_file(file, processed_info):
             print(f"スキップ（未変更）: {file.name}")
             skipped_count += 1
             continue
         
-        output_file = generate_output_filename(file, output_directory)
+        output_file = generate_output_filename(file, output_directory, username)
         print(f"処理中: {file.name} → {output_file.name}")
         
         success = convert_log_to_markdown(file, output_file)
@@ -378,6 +404,7 @@ def main():
     parser.add_argument('--config', help='設定ファイルパス')
     parser.add_argument('--all', action='store_true', help='全てのファイルを処理（デフォルト制限を無視）')
     parser.add_argument('--force', action='store_true', help='未変更でも強制処理')
+    parser.add_argument('--username', '-u', help='出力ファイル名に使用するユーザー名')
     
     args = parser.parse_args()
     
@@ -414,10 +441,11 @@ def main():
             exit(1)
         
         # 単一ファイル処理
+        username = args.username or config.get_username()
         if args.output:
             output_file = Path(args.output)
         else:
-            output_file = generate_output_filename(input_file, config.get_output_directory())
+            output_file = generate_output_filename(input_file, config.get_output_directory(), username)
         
         if not args.force and config.get_skip_unchanged() and not should_process_file(input_file, processed_info):
             print(f"スキップ（未変更）: {input_file.name}")
@@ -451,7 +479,7 @@ def main():
         if args.force:
             processed_info = {}  # 処理済み情報をクリア
         
-        success = process_multiple_files(files, config, processed_info, info_file)
+        success = process_multiple_files(files, config, processed_info, info_file, args.username)
         if not success:
             exit(1)
 
