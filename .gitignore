@@ -1,0 +1,28 @@
+# 実行時に生成されるファイル
+processed_files.json
+
+# 設定ファイル（個人設定）
+log_converter_config.ini
+
+# 生成されたMarkdownファイル
+log_*.md
+
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE関連
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS関連
+.DS_Store
+Thumbs.db
