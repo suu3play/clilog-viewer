@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Log Viewer</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- ヘッダー -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">🤖 Claude Log Viewer</h1>
+                <div class="header-controls">
+                    <div class="search-container">
+                        <input type="text" id="searchInput" placeholder="メッセージを検索..." class="search-input">
+                        <button id="searchBtn" class="search-btn">🔍</button>
+                    </div>
+                    <div class="file-selector">
+                        <select id="fileSelect" class="file-select">
+                            <option value="">ファイルを選択...</option>
+                        </select>
+                        <span id="fileStatus" class="file-status"></span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="main">
+            <!-- サイドバー -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h3>ファイル一覧</h3>
+                    <button id="toggleSidebar" class="toggle-btn">←</button>
+                </div>
+                <div class="file-list" id="fileList">
+                    <!-- ファイル一覧がここに動的に追加される -->
+                </div>
+                <div class="sidebar-footer">
+                    <button id="buildCacheBtn" class="cache-btn">キャッシュ作成</button>
+                    <button id="clearCacheBtn" class="cache-btn secondary">キャッシュ削除</button>
+                </div>
+            </aside>
+
+            <!-- チャット領域 -->
+            <section class="chat-area">
+                <!-- ローディング表示 -->
+                <div id="loading" class="loading hidden">
+                    <div class="loading-spinner"></div>
+                    <p>読み込み中...</p>
+                </div>
+
+                <!-- メッセージ表示エリア -->
+                <div id="messageArea" class="message-area">
+                    <div class="welcome-message">
+                        <h2>Claude Log Viewer へようこそ</h2>
+                        <p>左側のファイル一覧から会話ログを選択してください。</p>
+                        <div class="features">
+                            <div class="feature">
+                                <h3>⚡ 高速読み込み</h3>
+                                <p>SQLiteキャッシュによる超高速表示</p>
+                            </div>
+                            <div class="feature">
+                                <h3>🔍 高速検索</h3>
+                                <p>全文検索で瞬時に目的の会話を発見</p>
+                            </div>
+                            <div class="feature">
+                                <h3>📱 レスポンシブ</h3>
+                                <p>デスクトップ・モバイルどちらでも快適</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Virtual Scrolling用のコンテナ -->
+                <div id="virtualScroller" class="virtual-scroller hidden">
+                    <div id="scrollContent" class="scroll-content"></div>
+                </div>
+
+                <!-- 検索結果 -->
+                <div id="searchResults" class="search-results hidden">
+                    <div class="search-header">
+                        <h3 id="searchTitle">検索結果</h3>
+                        <button id="closeSearch" class="close-btn">×</button>
+                    </div>
+                    <div id="searchList" class="search-list"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- フッター -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="stats" id="stats">
+                    <span id="messageCount">メッセージ: 0</span>
+                    <span id="cacheStatus">キャッシュ: 未読み込み</span>
+                    <span id="loadTime">読み込み時間: -</span>
+                </div>
+                <div class="theme-toggle">
+                    <button id="themeToggle" class="theme-btn">🌙</button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- モーダル -->
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">タイトル</h3>
+                <button id="modalClose" class="close-btn">×</button>
+            </div>
+            <div id="modalBody" class="modal-body">
+                <!-- モーダル内容 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知 -->
+    <div id="notifications" class="notifications"></div>
+
+    <!-- JavaScript -->
+    <script src="/static/js/virtual-scroller.js"></script>
+    <script src="/static/js/api-client.js"></script>
+    <script src="/static/js/ui-manager.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

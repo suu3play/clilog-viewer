@@ -26,3 +26,8 @@ ENV/
 # OS関連
 .DS_Store
 Thumbs.db
+
+# Claude Log Viewer specific
+viewer/cache/*.db
+viewer/cache/*.db-*
+*.log
