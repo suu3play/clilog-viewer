@@ -118,6 +118,11 @@ class VirtualScroller {
         // リンクの処理
         content = this.processLinks(content);
         
+        // メッセージの行数をチェックして折り畳みが必要か判定
+        const needsCollapse = this.shouldCollapseMessage(content);
+        const collapseClass = needsCollapse ? 'collapsed' : '';
+        const expandButton = needsCollapse ? '<button class="message-expand-btn" onclick="toggleMessageExpand(this)">続きを読む</button>' : '';
+        
         return `
             <div class="message-header">
                 <div class="message-role">
@@ -126,8 +131,9 @@ class VirtualScroller {
                 </div>
                 <div class="message-timestamp">${timestamp}</div>
             </div>
-            <div class="message-content">
+            <div class="message-content ${collapseClass}">
                 ${content}
+                ${expandButton}
             </div>
         `;
     }
@@ -212,6 +218,18 @@ class VirtualScroller {
         return div.innerHTML;
     }
     
+    shouldCollapseMessage(content) {
+        // HTMLタグを除去してプレーンテキストの行数をカウント
+        const textContent = content.replace(/<[^>]*>/g, '');
+        const lines = textContent.split('\n').length;
+        
+        // 文字数でも判定（長い行がある場合）
+        const averageCharsPerLine = 60;
+        const estimatedLines = textContent.length / averageCharsPerLine;
+        
+        return Math.max(lines, estimatedLines) > 3;
+    }
+    
     throttle(func, limit) {
         let inThrottle;
         return function() {
@@ -264,5 +282,17 @@ window.toggleToolDetails = function(header) {
     } else {
         details.style.display = 'none';
         icon.textContent = '▼';
+    }
+};
+
+window.toggleMessageExpand = function(button) {
+    const messageContent = button.closest('.message-content');
+    
+    if (messageContent.classList.contains('collapsed')) {
+        messageContent.classList.remove('collapsed');
+        button.textContent = '折り畳む';
+    } else {
+        messageContent.classList.add('collapsed');
+        button.textContent = '続きを読む';
     }
 };
