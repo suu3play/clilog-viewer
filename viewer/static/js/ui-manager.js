@@ -169,9 +169,16 @@ class UIManager {
     async handleFileSelect(filePath) {
         if (!filePath) return;
         
+        // 既に同じファイルが選択されている場合はスキップ
+        if (this.state.currentFile === filePath) return;
+        
         try {
             this.showLoading('メッセージを読み込み中...');
             this.state.currentFile = filePath;
+            
+            // ファイル名を取得してステータス表示
+            const fileName = filePath.split('/').pop() || filePath;
+            this.updateFileStatus(`${fileName}を読み込み中...`);
             
             const startTime = Date.now();
             const data = await apiClient.getMessages(filePath);
@@ -180,13 +187,22 @@ class UIManager {
             this.state.currentMessages = data.messages;
             this.showMessages(data.messages);
             this.updateStats(data.total, loadTime);
-            this.updateFileStatus(`${data.total}メッセージ`);
+            this.updateFileStatus(`${data.total}メッセージ (${fileName})`);
             
             // アクティブファイル表示
             this.updateActiveFile(filePath);
             
+            // 成功通知
+            this.showNotification(`${fileName}を読み込みました (${data.total}メッセージ)`, 'success');
+            
         } catch (error) {
             this.showNotification('メッセージの読み込みに失敗しました: ' + error.message, 'error');
+            
+            // エラー時はファイル選択をクリア
+            this.state.currentFile = null;
+            this.updateFileStatus('ファイル選択をクリア');
+            this.showWelcomeMessage();
+            
         } finally {
             this.hideLoading();
         }
