@@ -65,8 +65,7 @@ class ApiClient {
         }
     }
     
-    async getMessages(filename, options = {}) {
-        const { page = 1, perPage = 50 } = options;
+    async getMessages(filename, page = 1, perPage = 50) {
         const cacheKey = `messages_${filename}_${page}_${perPage}`;
         
         try {

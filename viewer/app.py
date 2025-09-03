@@ -4,16 +4,56 @@
 SQLiteキャッシュによる高速化を実装
 """
 import os
+import sys
 import json
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from message_cache import MessageCache, load_chat_messages, build_initial_cache
 
+# 親ディレクトリのlog_converter.pyからConfigクラスをインポート
+sys.path.append(str(Path(__file__).parent.parent))
+try:
+    from log_converter import Config
+except ImportError as e:
+    print(f"警告: 設定ファイルの読み込みに失敗しました: {e}")
+    Config = None
+
 app = Flask(__name__)
 
 # 設定
 app.config['SECRET_KEY'] = 'claude-log-viewer-secret-key'
-LOGS_DIR = Path('../')  # claude-logディレクトリ（相対パス）
+
+def get_logs_directory():
+    """設定ファイルからログディレクトリを取得"""
+    try:
+        if Config is None:
+            print("警告: Configクラスが利用できません。デフォルトパスを使用します。")
+            return Path('../')
+        
+        # 設定ファイルのパスを解決（viewerディレクトリから見た相対パス）
+        config_file = Path(__file__).parent.parent / 'log_converter_config.ini'
+        
+        if not config_file.exists():
+            print(f"警告: 設定ファイルが見つかりません: {config_file}")
+            return Path('../')
+        
+        config = Config(str(config_file))
+        output_dir = config.get_output_directory()
+        
+        # 相対パスの場合は設定ファイルの場所を基準に解決
+        if not output_dir.is_absolute():
+            output_dir = config_file.parent / output_dir
+        
+        print(f"設定ファイルから読み込んだログディレクトリ: {output_dir}")
+        return output_dir.resolve()
+        
+    except Exception as e:
+        print(f"エラー: 設定ファイルの読み込みに失敗しました: {e}")
+        print("デフォルトパス '../' を使用します。")
+        return Path('../')
+
+# ログディレクトリを動的に取得
+LOGS_DIR = get_logs_directory()
 
 # グローバルキャッシュインスタンス
 cache = MessageCache()
@@ -35,20 +75,57 @@ def get_files():
             md_files.extend(LOGS_DIR.glob(pattern))
         
         files_info = []
-        for file_path in sorted(md_files, key=lambda x: x.stat().st_mtime, reverse=True):
+        for file_path in md_files:
             stat = file_path.stat()
             
             # キャッシュ状況確認
             file_id = cache.is_cached_and_valid(file_path)
             is_cached = file_id is not None
             
+            # 最後のメッセージの日時を取得
+            last_message_time = None
+            try:
+                messages = load_chat_messages(file_path)
+                if messages:
+                    # 最後のメッセージのタイムスタンプを取得
+                    last_message = messages[-1]
+                    if 'timestamp' in last_message:
+                        from datetime import datetime
+                        if isinstance(last_message['timestamp'], str):
+                            # ISO形式またはJST形式の文字列をパース
+                            timestamp_str = last_message['timestamp'].replace(' JST', '')
+                            try:
+                                # ISO形式を試す
+                                dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                                last_message_time = int(dt.timestamp())
+                            except:
+                                # JST形式を試す（例: 2024-03-31 14:28:15）
+                                try:
+                                    dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                                    last_message_time = int(dt.timestamp())
+                                except:
+                                    # パースに失敗した場合はファイルの更新時刻を使用
+                                    last_message_time = int(stat.st_mtime)
+                        else:
+                            last_message_time = int(last_message['timestamp'])
+                    else:
+                        last_message_time = int(stat.st_mtime)
+                else:
+                    last_message_time = int(stat.st_mtime)
+            except Exception as e:
+                print(f"ファイル {file_path.name} の最終メッセージ日時取得エラー: {e}")
+                last_message_time = int(stat.st_mtime)
+            
             files_info.append({
                 'path': str(file_path.relative_to(LOGS_DIR)),
                 'name': file_path.name,
                 'size': stat.st_size,
-                'modified': int(stat.st_mtime),
+                'modified': last_message_time,  # 最終メッセージ時刻を使用
                 'is_cached': is_cached
             })
+        
+        # 最終メッセージ時刻順でソート
+        files_info.sort(key=lambda x: x['modified'], reverse=True)
         
         return jsonify({
             'success': True,
