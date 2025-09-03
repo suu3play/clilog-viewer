@@ -77,6 +77,14 @@
                 <!-- Virtual Scrolling用のコンテナ -->
                 <div id="virtualScroller" class="virtual-scroller hidden">
                     <div id="scrollContent" class="scroll-content"></div>
+                    <div id="pagination" class="pagination hidden">
+                        <button id="prevPage" class="pagination-btn" disabled>‹ 前へ</button>
+                        <div class="pagination-info">
+                            <span id="currentPage">1</span> / <span id="totalPages">1</span>
+                            (<span id="totalMessages">0</span>メッセージ中 <span id="messageRange">1-50</span>)
+                        </div>
+                        <button id="nextPage" class="pagination-btn" disabled>次へ ›</button>
+                    </div>
                 </div>
 
                 <!-- 検索結果 -->

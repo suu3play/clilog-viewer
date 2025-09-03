@@ -143,11 +143,13 @@ class VirtualScroller {
         return content.replace(/```(\w+)?\n([\s\S]*?)\n```/g, (match, language, code) => {
             const lang = language || 'text';
             const escapedCode = this.escapeHtml(code);
+            // data-code属性には生のコードを、HTMLでエスケープして格納
+            const dataCodeEscaped = code.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             return `
                 <div class="code-block">
                     <div class="code-header">
                         <span class="code-language">${lang}</span>
-                        <button class="copy-btn" onclick="copyToClipboard(this)" data-code="${this.escapeHtml(code)}">
+                        <button class="copy-btn" onclick="copyToClipboard(this)" data-code="${dataCodeEscaped}">
                             📋 コピー
                         </button>
                     </div>
@@ -261,14 +263,41 @@ class VirtualScroller {
 // グローバル関数
 window.copyToClipboard = function(button) {
     const code = button.getAttribute('data-code');
-    navigator.clipboard.writeText(code).then(() => {
+    // HTMLエンティティをデコード
+    const decodedCode = code
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');
+    
+    console.log('コピー対象コード:', decodedCode);
+    
+    navigator.clipboard.writeText(decodedCode).then(() => {
         button.textContent = '✅ コピー済み';
         setTimeout(() => {
             button.innerHTML = '📋 コピー';
         }, 2000);
     }).catch(err => {
         console.error('コピーに失敗:', err);
-        showNotification('コピーに失敗しました', 'error');
+        // Fallbackとして古い方法を試す
+        try {
+            const textArea = document.createElement('textarea');
+            textArea.value = decodedCode;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            button.textContent = '✅ コピー済み';
+            setTimeout(() => {
+                button.innerHTML = '📋 コピー';
+            }, 2000);
+        } catch (fallbackErr) {
+            console.error('Fallbackコピーも失敗:', fallbackErr);
+            if (window.uiManager) {
+                window.uiManager.showNotification('コピーに失敗しました', 'error');
+            }
+        }
     });
 };
 
@@ -285,14 +314,3 @@ window.toggleToolDetails = function(header) {
     }
 };
 
-window.toggleMessageExpand = function(button) {
-    const messageContent = button.closest('.message-content');
-    
-    if (messageContent.classList.contains('collapsed')) {
-        messageContent.classList.remove('collapsed');
-        button.textContent = '折り畳む';
-    } else {
-        messageContent.classList.add('collapsed');
-        button.textContent = '続きを読む';
-    }
-};
