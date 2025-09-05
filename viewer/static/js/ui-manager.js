@@ -39,7 +39,6 @@ class UIManager {
             startDate: document.getElementById('startDate'),
             endDate: document.getElementById('endDate'),
             dateSearchBtn: document.getElementById('dateSearchBtn'),
-            fileSelect: document.getElementById('fileSelect'),
             fileStatus: document.getElementById('fileStatus'),
             
             // サイドバー
@@ -96,9 +95,6 @@ class UIManager {
         // 日付検索
         this.elements.dateSearchBtn.addEventListener('click', () => this.handleDateSearch());
         
-        // ファイル選択
-        this.elements.fileSelect.addEventListener('change', (e) => this.handleFileSelect(e.target.value));
-        
         // サイドバー
         this.elements.toggleSidebar.addEventListener('click', () => this.toggleSidebar());
         this.elements.buildCacheBtn.addEventListener('click', () => this.handleBuildCache());
@@ -130,9 +126,6 @@ class UIManager {
             
             const data = await apiClient.getFiles();
             
-            // ファイル選択肢更新
-            this.updateFileSelect(data.files);
-            
             // サイドバーファイル一覧更新
             this.updateFileList(data.files);
             
@@ -145,20 +138,6 @@ class UIManager {
         }
     }
     
-    updateFileSelect(files) {
-        const select = this.elements.fileSelect;
-        select.innerHTML = '<option value="">ファイルを選択...</option>';
-        
-        files.forEach(file => {
-            const option = document.createElement('option');
-            option.value = file.path;
-            option.textContent = file.name;
-            if (file.is_cached) {
-                option.textContent += ' ⚡';
-            }
-            select.appendChild(option);
-        });
-    }
     
     updateFileList(files) {
         const list = this.elements.fileList;
@@ -774,9 +753,6 @@ class UIManager {
                 item.classList.add('active');
             }
         });
-        
-        // ファイル選択肢の更新
-        this.elements.fileSelect.value = filePath;
     }
     
     handleKeyboard(e) {

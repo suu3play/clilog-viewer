@@ -26,6 +26,62 @@ def format_timestamp(timestamp_str):
         return timestamp_str
 
 
+def parse_message_date(timestamp_str):
+    """メッセージの日付を解析してdatetimeオブジェクトを返す"""
+    try:
+        # UTC時刻をパース
+        dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        return dt
+    except:
+        return None
+
+
+class DateFilter:
+    """日付範囲フィルタクラス"""
+    def __init__(self, start_date=None, end_date=None):
+        self.start_date = self._parse_date(start_date) if start_date else None
+        self.end_date = self._parse_date(end_date) if end_date else None
+        
+        # 終了日は23:59:59まで含める
+        if self.end_date:
+            self.end_date = self.end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    def _parse_date(self, date_str):
+        """日付文字列をdatetimeに変換（YYYY-MM-DD形式）"""
+        try:
+            if isinstance(date_str, str):
+                # YYYY-MM-DD形式を想定
+                dt = datetime.strptime(date_str, '%Y-%m-%d')
+                # UTCタイムゾーンを設定
+                return dt.replace(tzinfo=timezone.utc)
+            elif isinstance(date_str, datetime):
+                return date_str
+            else:
+                return None
+        except ValueError:
+            print(f"警告: 日付形式が無効です: {date_str}")
+            return None
+    
+    def is_in_range(self, message_date):
+        """メッセージ日付が範囲内かチェック"""
+        if not isinstance(message_date, datetime):
+            return True  # 日付が不明な場合は含める
+        
+        # 開始日のチェック
+        if self.start_date and message_date < self.start_date:
+            return False
+        
+        # 終了日のチェック
+        if self.end_date and message_date > self.end_date:
+            return False
+        
+        return True
+    
+    def is_active(self):
+        """フィルタが有効かどうか"""
+        return self.start_date is not None or self.end_date is not None
+
+
 def extract_content(message):
     """メッセージからコンテンツを抽出"""
     if isinstance(message, dict):
@@ -68,7 +124,7 @@ def clean_text(text):
     return text
 
 
-def process_log_line(line):
+def process_log_line(line, date_filter=None):
     """ログの1行を処理"""
     try:
         data = json.loads(line.strip())
@@ -76,6 +132,12 @@ def process_log_line(line):
         # 基本情報の抽出
         timestamp = data.get('timestamp', '')
         user_type = data.get('userType', data.get('type', ''))
+        
+        # 日付フィルタリング
+        if date_filter and timestamp:
+            message_date = parse_message_date(timestamp)
+            if message_date and not date_filter.is_in_range(message_date):
+                return None
         
         # メッセージ内容の抽出
         message_data = data.get('message', {})
@@ -164,7 +226,7 @@ def should_process_file(input_file, processed_info):
     return True
 
 
-def convert_log_to_markdown(input_file, output_file=None):
+def convert_log_to_markdown(input_file, output_file=None, date_filter=None):
     """ログファイルをMarkdownに変換"""
     if output_file is None:
         output_file = Path(input_file).with_suffix('.md')
@@ -176,7 +238,7 @@ def convert_log_to_markdown(input_file, output_file=None):
         with open(input_file, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.strip():
-                    processed = process_log_line(line)
+                    processed = process_log_line(line, date_filter)
                     if processed:
                         messages.append(processed)
     except FileNotFoundError:
@@ -255,7 +317,9 @@ class Config:
             'output_directory': '',  # 空の場合は作業ディレクトリ
             'username': '',  # 空の場合は端末ユーザー名
             'max_files': '10',
-            'skip_unchanged': 'true'
+            'skip_unchanged': 'true',
+            'date_start': '',  # 開始日（YYYY-MM-DD）
+            'date_end': ''     # 終了日（YYYY-MM-DD）
         }
         self.save_config()
         print(f"設定ファイルを作成しました: {self.config_file}")
@@ -296,6 +360,21 @@ class Config:
             return getpass.getuser()
         except Exception:
             return "unknown"
+    
+    def get_date_filter(self):
+        """日付フィルタ設定を取得"""
+        start_date = self.config.get('DEFAULT', 'date_start', fallback='')
+        end_date = self.config.get('DEFAULT', 'date_end', fallback='')
+        
+        if start_date or end_date:
+            return DateFilter(start_date or None, end_date or None)
+        return None
+    
+    def set_date_range(self, start_date, end_date):
+        """日付範囲を設定"""
+        self.config.set('DEFAULT', 'date_start', start_date or '')
+        self.config.set('DEFAULT', 'date_end', end_date or '')
+        self.save_config()
 
 
 def find_log_files(log_directory=None):
@@ -353,10 +432,11 @@ def select_log_file(files):
             return None
 
 
-def process_multiple_files(files, config, processed_info, info_file, username=None):
+def process_multiple_files(files, config, processed_info, info_file, username=None, date_filter=None):
     """複数ファイルを一括処理"""
     processed_count = 0
     skipped_count = 0
+    filtered_count = 0
     
     output_directory = config.get_output_directory()
     skip_unchanged = config.get_skip_unchanged()
@@ -365,6 +445,10 @@ def process_multiple_files(files, config, processed_info, info_file, username=No
     if username is None:
         username = config.get_username()
     
+    # 日付フィルタが指定されていない場合は設定から取得
+    if date_filter is None:
+        date_filter = config.get_date_filter()
+    
     for file in files:
         if skip_unchanged and not should_process_file(file, processed_info):
             print(f"スキップ（未変更）: {file.name}")
@@ -372,24 +456,41 @@ def process_multiple_files(files, config, processed_info, info_file, username=No
             continue
         
         output_file = generate_output_filename(file, output_directory, username)
-        print(f"処理中: {file.name} → {output_file.name}")
         
-        success = convert_log_to_markdown(file, output_file)
+        # 日付フィルタが設定されている場合の表示
+        if date_filter and date_filter.is_active():
+            print(f"処理中（日付フィルタ適用）: {file.name} → {output_file.name}")
+        else:
+            print(f"処理中: {file.name} → {output_file.name}")
+        
+        success = convert_log_to_markdown(file, output_file, date_filter)
         if success:
-            # 処理済み情報を更新
-            processed_info[file.name] = {
-                'mtime': file.stat().st_mtime,
-                'output_file': str(output_file),
-                'processed_at': datetime.now(timezone(timedelta(hours=9))).isoformat()
-            }
-            processed_count += 1
+            # 出力ファイルが空でないかチェック
+            if output_file.exists() and output_file.stat().st_size > 100:  # ヘッダーのみでないかチェック
+                # 処理済み情報を更新
+                processed_info[file.name] = {
+                    'mtime': file.stat().st_mtime,
+                    'output_file': str(output_file),
+                    'processed_at': datetime.now(timezone(timedelta(hours=9))).isoformat(),
+                    'date_filter': f"{date_filter.start_date}~{date_filter.end_date}" if date_filter and date_filter.is_active() else None
+                }
+                processed_count += 1
+            else:
+                print(f"  → 日付フィルタにより除外されました")
+                filtered_count += 1
+                # 空のファイルは削除
+                if output_file.exists():
+                    output_file.unlink()
         else:
             print(f"エラー: {file.name} の処理に失敗")
     
     # 処理済み情報を保存
     save_processed_files_info(info_file, processed_info)
     
-    print(f"\n処理完了: {processed_count}件, スキップ: {skipped_count}件")
+    if date_filter and date_filter.is_active():
+        print(f"\n処理完了: {processed_count}件, スキップ: {skipped_count}件, フィルタ除外: {filtered_count}件")
+    else:
+        print(f"\n処理完了: {processed_count}件, スキップ: {skipped_count}件")
     return processed_count > 0
 
 
@@ -405,11 +506,36 @@ def main():
     parser.add_argument('--all', action='store_true', help='全てのファイルを処理（デフォルト制限を無視）')
     parser.add_argument('--force', action='store_true', help='未変更でも強制処理')
     parser.add_argument('--username', '-u', help='出力ファイル名に使用するユーザー名')
+    parser.add_argument('--start-date', help='開始日（YYYY-MM-DD形式）')
+    parser.add_argument('--end-date', help='終了日（YYYY-MM-DD形式）')
+    parser.add_argument('--set-date-range', action='store_true', help='日付範囲を設定ファイルに保存')
     
     args = parser.parse_args()
     
     # 設定読み込み
     config = Config(args.config or 'log_converter_config.ini')
+    
+    # 日付範囲設定の保存
+    if args.set_date_range:
+        start_date = args.start_date or ''
+        end_date = args.end_date or ''
+        config.set_date_range(start_date, end_date)
+        print(f"日付範囲を設定しました: {start_date} 〜 {end_date}")
+        return
+    
+    # 日付フィルタの作成
+    date_filter = None
+    if args.start_date or args.end_date:
+        # コマンドライン引数から日付フィルタ作成
+        date_filter = DateFilter(args.start_date, args.end_date)
+        print(f"日付フィルタ: {args.start_date or '開始日なし'} 〜 {args.end_date or '終了日なし'}")
+    else:
+        # 設定ファイルから日付フィルタ取得
+        date_filter = config.get_date_filter()
+        if date_filter and date_filter.is_active():
+            start_str = date_filter.start_date.strftime('%Y-%m-%d') if date_filter.start_date else '開始日なし'
+            end_str = date_filter.end_date.strftime('%Y-%m-%d') if date_filter.end_date else '終了日なし'
+            print(f"設定ファイルの日付フィルタを使用: {start_str} 〜 {end_str}")
     
     # 処理済みファイル情報
     info_file = Path('processed_files.json')
@@ -452,12 +578,13 @@ def main():
             print("強制処理する場合は --force オプションを使用してください。")
             return
         
-        success = convert_log_to_markdown(input_file, output_file)
+        success = convert_log_to_markdown(input_file, output_file, date_filter)
         if success:
             processed_info[input_file.name] = {
                 'mtime': input_file.stat().st_mtime,
                 'output_file': str(output_file),
-                'processed_at': datetime.now(timezone(timedelta(hours=9))).isoformat()
+                'processed_at': datetime.now(timezone(timedelta(hours=9))).isoformat(),
+                'date_filter': f"{date_filter.start_date}~{date_filter.end_date}" if date_filter and date_filter.is_active() else None
             }
             save_processed_files_info(info_file, processed_info)
         if not success:
@@ -479,7 +606,7 @@ def main():
         if args.force:
             processed_info = {}  # 処理済み情報をクリア
         
-        success = process_multiple_files(files, config, processed_info, info_file, args.username)
+        success = process_multiple_files(files, config, processed_info, info_file, args.username, date_filter)
         if not success:
             exit(1)
 

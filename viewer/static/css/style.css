@@ -166,21 +166,9 @@ body {
     color: var(--primary-color);
 }
 
-.file-selector {
+.status-display {
     display: flex;
     align-items: center;
-    gap: var(--spacing-2);
-}
-
-.file-select {
-    min-width: 200px;
-    padding: var(--spacing-2) var(--spacing-3);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background-color: var(--bg-color);
-    color: var(--text-primary);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
 }
 
 .file-status {
