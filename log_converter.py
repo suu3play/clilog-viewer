@@ -298,14 +298,26 @@ def process_log_file_to_database(file_path, database):
     messages = []
     filename = file_path.name
     
+    print(f"  → ファイルを読み込み中...")
+    
     # ログファイルを読み込み
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-            for line in f:
+            lines = f.readlines()
+            total_lines = len(lines)
+            print(f"  → 総行数: {total_lines}行")
+            
+            for i, line in enumerate(lines, 1):
                 if line.strip():
                     processed = process_log_line(line)
                     if processed:
                         messages.append(processed)
+                
+                # 100行ごとに進捗表示
+                if i % 100 == 0 or i == total_lines:
+                    found_messages = len(messages)
+                    print(f"    進捗: {i}/{total_lines}行 ({i/total_lines*100:.1f}%) - 会話データ: {found_messages}件")
+                    
     except FileNotFoundError:
         print(f"ファイルが見つかりません: {file_path}")
         return False
@@ -319,23 +331,34 @@ def process_log_file_to_database(file_path, database):
     
     # データベースに登録
     try:
+        print(f"  → データベースに登録中 ({len(messages)}件)")
+        
         # ファイルを登録してIDを取得
         log_file_id = database.register_file(file_path)
         
         # 既存の会話データを削除
         database.clear_conversations_for_file(log_file_id)
         
-        # 会話データを登録
-        for msg in messages:
-            database.insert_conversation(
-                log_file_id,
-                msg['role'],
-                msg['timestamp'],
-                msg['content'],
-                filename
-            )
+        # 会話データを100件ずつ登録（トランザクションで高速化）
+        import sqlite3
+        with sqlite3.connect(database.db_path) as conn:
+            batch_size = 100
+            for i in range(0, len(messages), batch_size):
+                batch = messages[i:i + batch_size]
+                
+                # バッチでINSERT
+                conn.executemany('''
+                    INSERT INTO conversations 
+                    (log_file_id, role, timestamp, content, filename)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', [(log_file_id, msg['role'], msg['timestamp'], msg['content'], filename) 
+                      for msg in batch])
+                
+                # 進捗表示
+                processed_count = min(i + batch_size, len(messages))
+                print(f"    登録進捗: {processed_count}/{len(messages)}件 ({processed_count/len(messages)*100:.1f}%)")
         
-        print(f"  → {len(messages)}件の会話データを登録")
+        print(f"  ✓ 登録完了: {len(messages)}件の会話データ")
         return True
         
     except Exception as e:
@@ -532,9 +555,13 @@ def process_multiple_files_to_database(files, database):
     """複数ファイルをデータベースに一括処理"""
     processed_count = 0
     skipped_count = 0
+    total_files = len(files)
     
-    for file in files:
-        print(f"処理中: {file.name}")
+    print(f"処理対象ファイル: {total_files}件")
+    print("=" * 60)
+    
+    for i, file in enumerate(files, 1):
+        print(f"\n[{i}/{total_files}] 処理中: {file.name}")
         
         # ファイルが変更されているかチェック
         if not database.is_file_changed(file):
@@ -546,9 +573,14 @@ def process_multiple_files_to_database(files, database):
         if success:
             processed_count += 1
         else:
-            print(f"  → エラー: {file.name} の処理に失敗")
+            print(f"  ✗ エラー: {file.name} の処理に失敗")
+        
+        # ファイル処理完了の進捗表示
+        progress = i / total_files * 100
+        print(f"  📊 全体進捗: {i}/{total_files}ファイル ({progress:.1f}%)")
     
-    print(f"\n処理完了: {processed_count}件, スキップ: {skipped_count}件")
+    print("\n" + "=" * 60)
+    print(f"🎉 処理完了: {processed_count}件処理, {skipped_count}件スキップ")
     return processed_count > 0
 
 
