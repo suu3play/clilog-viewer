@@ -28,6 +28,23 @@ def format_timestamp(timestamp_str):
         return timestamp_str
 
 
+def convert_utc_to_jst(timestamp_str):
+    """UTCタイムスタンプをJST形式（データベース用）に変換"""
+    try:
+        # UTC時刻をパース
+        dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        
+        # JSTに変換（UTC+9）
+        jst = timezone(timedelta(hours=9))
+        dt_jst = dt.astimezone(jst)
+        
+        # SQLiteで使いやすい形式で返す
+        return dt_jst.strftime('%Y-%m-%d %H:%M:%S')
+    except:
+        # パースできない場合は元の形式を返す
+        return timestamp_str
+
+
 def parse_message_date(timestamp_str):
     """メッセージの日付を解析してdatetimeオブジェクトを返す"""
     try:
@@ -225,8 +242,10 @@ def process_log_line(line):
         if role in ['user', 'assistant'] and content:
             content = clean_text(content)
             if content:  # 空でない場合のみ返す
+                # UTCタイムスタンプをJSTに変換
+                jst_timestamp = convert_utc_to_jst(timestamp)
                 return {
-                    'timestamp': timestamp,  # ISO形式のまま保存
+                    'timestamp': jst_timestamp,  # JST形式で保存
                     'role': role,
                     'content': content
                 }
@@ -320,14 +339,14 @@ def process_log_file_to_database(file_path, database):
                     
     except FileNotFoundError:
         print(f"ファイルが見つかりません: {file_path}")
-        return False
+        return False, 0
     except Exception as e:
         print(f"ファイル読み込みエラー: {e}")
-        return False
+        return False, 0
     
     if not messages:
         print(f"  → 会話データが見つかりませんでした")
-        return True  # エラーではない
+        return True, 0  # エラーではないが0件
     
     # データベースに登録
     try:
@@ -358,30 +377,13 @@ def process_log_file_to_database(file_path, database):
                 processed_count = min(i + batch_size, len(messages))
                 print(f"    登録進捗: {processed_count}/{len(messages)}件 ({processed_count/len(messages)*100:.1f}%)")
         
-        print(f"  ✓ 登録完了: {len(messages)}件の会話データ")
-        return True
+        print(f"  [OK] 登録完了: {len(messages)}件の会話データ")
+        return True, len(messages)  # 登録件数を返す
         
     except Exception as e:
         print(f"  → データベース登録エラー: {e}")
-        return False
+        return False, 0
 
-
-def export_conversations_to_json(database, output_file, start_date=None, end_date=None):
-    """会話データをJSON形式で出力"""
-    try:
-        conversations = database.get_conversations_in_range(start_date, end_date)
-        
-        # JSON形式で出力
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(conversations, f, ensure_ascii=False, indent=2)
-        
-        print(f"JSON出力完了: {output_file}")
-        print(f"出力した会話データ: {len(conversations)}件")
-        return True
-        
-    except Exception as e:
-        print(f"JSON出力エラー: {e}")
-        return False
 
 
 class Config:
@@ -556,6 +558,7 @@ def process_multiple_files_to_database(files, database):
     processed_count = 0
     skipped_count = 0
     total_files = len(files)
+    total_conversations_added = 0
     
     print(f"処理対象ファイル: {total_files}件")
     print("=" * 60)
@@ -569,18 +572,27 @@ def process_multiple_files_to_database(files, database):
             skipped_count += 1
             continue
         
-        success = process_log_file_to_database(file, database)
+        # 処理前の会話データ数を取得
+        import sqlite3
+        with sqlite3.connect(database.db_path) as conn:
+            cursor = conn.execute('SELECT COUNT(*) FROM conversations')
+            before_count = cursor.fetchone()[0]
+        
+        success, conversation_count = process_log_file_to_database(file, database)
         if success:
             processed_count += 1
+            if conversation_count > 0:
+                total_conversations_added += conversation_count
         else:
-            print(f"  ✗ エラー: {file.name} の処理に失敗")
+            print(f"  [ERROR] {file.name} の処理に失敗")
         
         # ファイル処理完了の進捗表示
         progress = i / total_files * 100
-        print(f"  📊 全体進捗: {i}/{total_files}ファイル ({progress:.1f}%)")
+        print(f"  [進捗] {i}/{total_files}ファイル ({progress:.1f}%)")
     
     print("\n" + "=" * 60)
-    print(f"🎉 処理完了: {processed_count}件処理, {skipped_count}件スキップ")
+    print(f"[完了] 処理完了: {processed_count}件処理, {skipped_count}件スキップ")
+    print(f"[結果] 新規登録会話データ: {total_conversations_added:,}件")
     return processed_count > 0
 
 
@@ -602,10 +614,21 @@ def main():
     args = parser.parse_args()
     
     # 設定読み込み
-    config = Config(args.config or 'log_converter_config.ini')
+    config_path = args.config or 'log_converter_config.ini'
+    config = Config(config_path)
     
-    # データベース初期化
-    database = LogDatabase(args.db_path or 'log_data.db')
+    # データベース初期化（設定ファイルの出力ディレクトリを使用）
+    output_dir = config.get_output_directory()
+    if not output_dir.is_absolute():
+        # 相対パスの場合は設定ファイルの場所を基準に解決
+        output_dir = Path(config_path).parent / output_dir
+    
+    output_dir = output_dir.resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    db_path = output_dir / 'log_data.db'
+    database = LogDatabase(str(db_path))
+    print(f"データベースファイル: {db_path}")
     
     # データベース内容一覧表示モード
     if args.list:
@@ -656,17 +679,10 @@ def main():
         print("ファイル処理に失敗しました。")
         exit(1)
     
-    # JSON出力
-    output_file = args.output or 'conversations.json'
-    json_start = args.json_start_date
-    json_end = args.json_end_date
-    
-    if json_start or json_end:
-        print(f"JSON出力（会話日時フィルタ）: {json_start or '開始日なし'} 〜 {json_end or '終了日なし'}")
-    
-    success = export_conversations_to_json(database, output_file, json_start, json_end)
-    if not success:
-        exit(1)
+    # 処理完了メッセージ
+    print("\nSQLiteデータベースへの登録が完了しました。")
+    print(f"データはViewerアプリケーション（viewer/app.py）から確認できます。")
+    print(f"データベース場所: {db_path}")
 
 
 if __name__ == "__main__":

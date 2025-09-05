@@ -16,61 +16,61 @@
     --primary-hover: #1d4ed8;
     --secondary-color: #64748b;
     --accent-color: #f59e0b;
-    
+
     --bg-color: #ffffff;
     --bg-secondary: #f8fafc;
     --bg-tertiary: #e2e8f0;
-    
+
     --text-primary: #1e293b;
     --text-secondary: #475569;
     --text-muted: #94a3b8;
-    
+
     --border-color: #e2e8f0;
     --border-hover: #cbd5e1;
-    
+
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    
+
     --radius-sm: 0.25rem;
     --radius-md: 0.375rem;
     --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
-    
+
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
     --font-size-base: 1rem;
     --font-size-lg: 1.125rem;
     --font-size-xl: 1.25rem;
-    
+
     --spacing-1: 0.25rem;
     --spacing-2: 0.5rem;
     --spacing-3: 0.75rem;
     --spacing-4: 1rem;
     --spacing-6: 1.5rem;
     --spacing-8: 2rem;
-    
+
     --header-height: 4rem;
     --sidebar-width: 320px;
     --footer-height: 3rem;
 }
 
 /* ダークテーマ */
-[data-theme="dark"] {
+[data-theme='dark'] {
     --bg-color: #0f172a;
     --bg-secondary: #1e293b;
     --bg-tertiary: #334155;
-    
+
     --text-primary: #f1f5f9;
     --text-secondary: #cbd5e1;
     --text-muted: #64748b;
-    
+
     --border-color: #334155;
     --border-hover: #475569;
 }
 
-
-html, body {
+html,
+body {
     height: 100%;
     margin: 0;
     padding: 0;
@@ -78,7 +78,8 @@ html, body {
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+        'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
     font-size: var(--font-size-base);
     line-height: 1.6;
     color: var(--text-primary);
@@ -132,6 +133,40 @@ body {
     display: flex;
     align-items: center;
     position: relative;
+}
+
+.search-loading {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    align-items: center;
+    gap: var(--spacing-2);
+    background-color: var(--bg-color);
+    padding: var(--spacing-2) var(--spacing-3);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    z-index: 10;
+}
+
+.search-loading.active {
+    display: flex;
+}
+
+.search-loading-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.search-loading-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 .search-input {
@@ -221,6 +256,36 @@ body {
     background-color: #d97706;
 }
 
+.clear-btn {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ef4444;
+    border-radius: var(--radius-md);
+    background-color: #fef2f2;
+    color: #dc2626;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.clear-btn:hover {
+    background-color: #ef4444;
+    color: white;
+    border-color: #ef4444;
+}
+
+[data-theme='dark'] .clear-btn {
+    background-color: #1f2937;
+    border-color: #ef4444;
+    color: #f87171;
+}
+
+[data-theme='dark'] .clear-btn:hover {
+    background-color: #ef4444;
+    color: white;
+}
+
 /* ===== メイン ===== */
 .main {
     display: flex;
@@ -229,17 +294,9 @@ body {
     overflow: hidden;
 }
 
-/* ===== サイドバー ===== */
+/* ===== サイドバー（削除済み） ===== */
 .sidebar {
-    width: var(--sidebar-width);
-    background-color: var(--bg-secondary);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.3s ease;
-    flex-shrink: 0;
-    height: 100%;
-    overflow: hidden;
+    display: none;
 }
 
 .sidebar.collapsed {
@@ -309,7 +366,6 @@ body {
     margin-bottom: var(--spacing-1);
 }
 
-
 .file-icon {
     font-size: var(--font-size-lg);
 }
@@ -367,10 +423,176 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
     position: relative;
     height: 100%;
     padding-bottom: 80px;
+}
+
+/* メッセージ表示エリア */
+.message-area,
+#messageArea {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    height: 100%;
+}
+
+/* チャットUI用スタイル */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem 2rem;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.chat-message {
+    display: flex;
+    margin-bottom: 1rem;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+/* ユーザーメッセージ（右側） */
+.chat-message.user {
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+}
+
+/* アシスタントメッセージ（左側） */
+.chat-message.assistant {
+    flex-direction: row;
+    justify-content: flex-start;
+}
+
+.message-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0.25rem;
+}
+
+.avatar-icon {
+    font-size: 1.25rem;
+}
+
+.message-bubble {
+    width: 70%;
+    background-color: var(--bg-secondary);
+    border-radius: 1rem;
+    padding: 0.75rem 1rem;
+    box-shadow: var(--shadow-sm);
+}
+
+/* ユーザーメッセージのバブル */
+.chat-message.user .message-bubble {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.chat-message.user .message-avatar {
+    background-color: #ccffff;
+    color: white;
+}
+
+/* アシスタントメッセージのバブル */
+.chat-message.assistant .message-bubble {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.chat-message.assistant .message-avatar {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.message-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.message-number {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    background-color: rgba(245, 158, 11, 0.1);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+}
+
+.chat-message.user .message-number {
+    color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.message-role {
+    font-weight: 600;
+}
+
+.message-timestamp {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.message-content {
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* レスポンシブ対応 - チャット用 */
+@media (min-width: 1200px) {
+    .chat-container {
+        max-width: 1000px;
+        padding: 1rem 3rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .chat-container {
+        padding: 1rem 1rem;
+    }
+
+    .message-bubble {
+        width: 80%;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-container {
+        padding: 0.5rem;
+    }
+
+    .message-bubble {
+        width: 85%;
+    }
+
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+    }
+
+    .avatar-icon {
+        font-size: 1rem;
+    }
 }
 
 /* ===== ウェルカムメッセージ ===== */
@@ -598,7 +820,6 @@ body {
     line-height: 1.7;
     position: relative;
 }
-
 
 .message-content p {
     margin-bottom: var(--spacing-3);
@@ -909,7 +1130,7 @@ body {
     z-index: 1000;
 }
 
-[data-theme="dark"] .loading {
+[data-theme='dark'] .loading {
     background-color: rgba(15, 23, 42, 0.9);
 }
 
@@ -924,8 +1145,12 @@ body {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .loading p {
@@ -1041,12 +1266,12 @@ body {
     .search-input {
         width: 200px;
     }
-    
+
     .message-user {
         margin-left: 4%;
         margin-right: 1%;
     }
-    
+
     .message-assistant {
         margin-left: 1%;
         margin-right: 4%;
@@ -1057,15 +1282,15 @@ body {
     .header-controls {
         gap: var(--spacing-2);
     }
-    
+
     .search-input {
         width: 150px;
     }
-    
+
     .title {
         font-size: var(--font-size-lg);
     }
-    
+
     .sidebar {
         position: fixed;
         top: var(--header-height);
@@ -1074,29 +1299,29 @@ body {
         z-index: 200;
         width: 280px;
     }
-    
+
     .sidebar.mobile {
         transform: translateX(-100%);
     }
-    
+
     .sidebar.mobile:not(.collapsed) {
         transform: translateX(0);
     }
-    
+
     .message-user {
         margin-left: auto;
         margin-right: var(--spacing-2);
     }
-    
+
     .message-assistant {
         margin-left: var(--spacing-2);
         margin-right: auto;
     }
-    
+
     .welcome-message {
         padding: var(--spacing-4);
     }
-    
+
     .features {
         grid-template-columns: 1fr;
     }
@@ -1106,24 +1331,24 @@ body {
     .header-content {
         padding: 0 var(--spacing-2);
     }
-    
+
     .search-container {
         order: -1;
         width: 100%;
     }
-    
+
     .search-input {
         width: 100%;
     }
-    
+
     .file-selector {
         display: none;
     }
-    
+
     .sidebar {
         width: 100vw;
     }
-    
+
     .notification {
         max-width: calc(100vw - 2rem);
     }

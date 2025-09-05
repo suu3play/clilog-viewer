@@ -29,3 +29,4 @@ Thumbs.db
 viewer/cache/*.db
 viewer/cache/*.db-*
 *.log
+*.db

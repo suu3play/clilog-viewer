@@ -19,7 +19,7 @@ class ChatLogApp {
             // API進捗表示を設定
             this.apiClient.onProgress(({ message, percent }) => {
                 if (message) {
-                    this.uiManager.updateFileStatus(message);
+                    console.log('API Progress:', message);
                 }
                 if (percent !== null) {
                     this.updateProgressBar(percent);
@@ -41,18 +41,11 @@ class ChatLogApp {
     }
     
     async loadInitialData() {
-        // ファイル一覧を読み込み
-        await this.uiManager.loadFileList();
-        
         // 統計情報を読み込み
         await this.updateStats();
         
-        // URL パラメータで初期ファイルを指定
-        const urlParams = new URLSearchParams(window.location.search);
-        const initialFile = urlParams.get('file');
-        if (initialFile) {
-            await this.uiManager.handleFileSelect(initialFile);
-        }
+        // UIManagerはすでに初期化時にloadAllMessages()を呼び出すので、ここでは何もしない
+        console.log('初期データ読み込み完了');
     }
     
     async updateStats() {
