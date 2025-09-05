@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-会話ログをMarkdownファイルに変換するスクリプト
+会話ログをSQLiteデータベースに登録し、JSON形式で出力するスクリプト
 """
 import json
 import re
+import sqlite3
+import hashlib
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import configparser
@@ -36,50 +38,131 @@ def parse_message_date(timestamp_str):
         return None
 
 
-class DateFilter:
-    """日付範囲フィルタクラス"""
-    def __init__(self, start_date=None, end_date=None):
-        self.start_date = self._parse_date(start_date) if start_date else None
-        self.end_date = self._parse_date(end_date) if end_date else None
-        
-        # 終了日は23:59:59まで含める
-        if self.end_date:
-            self.end_date = self.end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+class LogDatabase:
+    """ログデータベース管理クラス"""
+    def __init__(self, db_path='log_data.db'):
+        self.db_path = Path(db_path)
+        self.init_database()
     
-    def _parse_date(self, date_str):
-        """日付文字列をdatetimeに変換（YYYY-MM-DD形式）"""
-        try:
-            if isinstance(date_str, str):
-                # YYYY-MM-DD形式を想定
-                dt = datetime.strptime(date_str, '%Y-%m-%d')
-                # UTCタイムゾーンを設定
-                return dt.replace(tzinfo=timezone.utc)
-            elif isinstance(date_str, datetime):
-                return date_str
+    def init_database(self):
+        """データベーススキーマを初期化"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.executescript('''
+                -- 読み取りファイルテーブル
+                CREATE TABLE IF NOT EXISTS log_files (
+                    id INTEGER PRIMARY KEY,
+                    filename TEXT UNIQUE NOT NULL,
+                    file_path TEXT NOT NULL,
+                    last_modified INTEGER NOT NULL,
+                    file_hash TEXT NOT NULL,
+                    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                -- 会話データテーブル
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY,
+                    log_file_id INTEGER REFERENCES log_files(id),
+                    role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+                    timestamp TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    filename TEXT NOT NULL
+                );
+
+                -- インデックス作成
+                CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
+                CREATE INDEX IF NOT EXISTS idx_conversations_role ON conversations(role);
+                CREATE INDEX IF NOT EXISTS idx_conversations_filename ON conversations(filename);
+                CREATE INDEX IF NOT EXISTS idx_log_files_modified ON log_files(last_modified);
+            ''')
+    
+    def get_file_hash(self, file_path):
+        """ファイルのハッシュ値を計算"""
+        hasher = hashlib.sha256()
+        with open(file_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    
+    def is_file_changed(self, file_path):
+        """ファイルが変更されているかチェック"""
+        file_stat = file_path.stat()
+        current_hash = self.get_file_hash(file_path)
+        
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('''
+                SELECT file_hash, last_modified FROM log_files 
+                WHERE file_path = ?
+            ''', (str(file_path),))
+            
+            result = cursor.fetchone()
+            if not result:
+                return True  # 新しいファイル
+            
+            stored_hash, stored_mtime = result
+            return current_hash != stored_hash or int(file_stat.st_mtime) != stored_mtime
+    
+    def register_file(self, file_path):
+        """ファイルをデータベースに登録"""
+        file_stat = file_path.stat()
+        file_hash = self.get_file_hash(file_path)
+        
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('''
+                INSERT OR REPLACE INTO log_files 
+                (filename, file_path, last_modified, file_hash)
+                VALUES (?, ?, ?, ?)
+            ''', (file_path.name, str(file_path), int(file_stat.st_mtime), file_hash))
+            
+            return cursor.lastrowid
+    
+    def clear_conversations_for_file(self, log_file_id):
+        """特定ファイルの会話データを削除"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('DELETE FROM conversations WHERE log_file_id = ?', (log_file_id,))
+    
+    def insert_conversation(self, log_file_id, role, timestamp, content, filename):
+        """会話データを登録"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                INSERT INTO conversations 
+                (log_file_id, role, timestamp, content, filename)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (log_file_id, role, timestamp, content, filename))
+    
+    def get_conversations_in_range(self, start_date=None, end_date=None):
+        """指定された日付範囲の会話データを取得"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            if start_date and end_date:
+                cursor = conn.execute('''
+                    SELECT role, timestamp, content, filename
+                    FROM conversations 
+                    WHERE datetime(timestamp) BETWEEN datetime(?) AND datetime(?)
+                    ORDER BY datetime(timestamp)
+                ''', (start_date, end_date))
+            elif start_date:
+                cursor = conn.execute('''
+                    SELECT role, timestamp, content, filename
+                    FROM conversations 
+                    WHERE datetime(timestamp) >= datetime(?)
+                    ORDER BY datetime(timestamp)
+                ''', (start_date,))
+            elif end_date:
+                cursor = conn.execute('''
+                    SELECT role, timestamp, content, filename
+                    FROM conversations 
+                    WHERE datetime(timestamp) <= datetime(?)
+                    ORDER BY datetime(timestamp)
+                ''', (end_date,))
             else:
-                return None
-        except ValueError:
-            print(f"警告: 日付形式が無効です: {date_str}")
-            return None
-    
-    def is_in_range(self, message_date):
-        """メッセージ日付が範囲内かチェック"""
-        if not isinstance(message_date, datetime):
-            return True  # 日付が不明な場合は含める
-        
-        # 開始日のチェック
-        if self.start_date and message_date < self.start_date:
-            return False
-        
-        # 終了日のチェック
-        if self.end_date and message_date > self.end_date:
-            return False
-        
-        return True
-    
-    def is_active(self):
-        """フィルタが有効かどうか"""
-        return self.start_date is not None or self.end_date is not None
+                cursor = conn.execute('''
+                    SELECT role, timestamp, content, filename
+                    FROM conversations 
+                    ORDER BY datetime(timestamp)
+                ''')
+            
+            return [dict(row) for row in cursor.fetchall()]
 
 
 def extract_content(message):
@@ -124,8 +207,8 @@ def clean_text(text):
     return text
 
 
-def process_log_line(line, date_filter=None):
-    """ログの1行を処理"""
+def process_log_line(line):
+    """ログの1行を処理してユーザー/アシスタントメッセージのみを返す"""
     try:
         data = json.loads(line.strip())
         
@@ -133,33 +216,17 @@ def process_log_line(line, date_filter=None):
         timestamp = data.get('timestamp', '')
         user_type = data.get('userType', data.get('type', ''))
         
-        # 日付フィルタリング
-        if date_filter and timestamp:
-            message_date = parse_message_date(timestamp)
-            if message_date and not date_filter.is_in_range(message_date):
-                return None
-        
         # メッセージ内容の抽出
         message_data = data.get('message', {})
         role = message_data.get('role', user_type)
         content = extract_content(message_data)
         
-        # サマリー情報の処理
-        if data.get('type') == 'summary':
-            return {
-                'timestamp': format_timestamp(timestamp),
-                'type': 'summary',
-                'content': data.get('summary', ''),
-                'role': 'system'
-            }
-        
-        # 通常のメッセージ処理
-        if content:
+        # ユーザーまたはアシスタントのメッセージのみ処理
+        if role in ['user', 'assistant'] and content:
             content = clean_text(content)
             if content:  # 空でない場合のみ返す
                 return {
-                    'timestamp': format_timestamp(timestamp),
-                    'type': 'message',
+                    'timestamp': timestamp,  # ISO形式のまま保存
                     'role': role,
                     'content': content
                 }
@@ -226,73 +293,71 @@ def should_process_file(input_file, processed_info):
     return True
 
 
-def convert_log_to_markdown(input_file, output_file=None, date_filter=None):
-    """ログファイルをMarkdownに変換"""
-    if output_file is None:
-        output_file = Path(input_file).with_suffix('.md')
-    
+def process_log_file_to_database(file_path, database):
+    """ログファイルを読み込んでデータベースに登録"""
     messages = []
+    filename = file_path.name
     
     # ログファイルを読み込み
     try:
-        with open(input_file, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.strip():
-                    processed = process_log_line(line, date_filter)
+                    processed = process_log_line(line)
                     if processed:
                         messages.append(processed)
     except FileNotFoundError:
-        print(f"ファイルが見つかりません: {input_file}")
+        print(f"ファイルが見つかりません: {file_path}")
         return False
     except Exception as e:
         print(f"ファイル読み込みエラー: {e}")
         return False
     
     if not messages:
-        print("変換可能なメッセージが見つかりませんでした")
-        return False
+        print(f"  → 会話データが見つかりませんでした")
+        return True  # エラーではない
     
-    # 出力ディレクトリが存在しない場合は作成
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Markdownファイルを生成
+    # データベースに登録
     try:
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write("# 会話ログ\n\n")
-            # 生成日時をJSTで表示
-            jst = timezone(timedelta(hours=9))
-            now_jst = datetime.now(jst)
-            f.write(f"生成日時: {now_jst.strftime('%Y-%m-%d %H:%M:%S JST')}\n\n")
-            f.write("---\n\n")
-            
-            for msg in messages:
-                timestamp = msg['timestamp']
-                role = msg['role']
-                content = msg['content']
-                msg_type = msg.get('type', 'message')
-                
-                if msg_type == 'summary':
-                    f.write(f"## 📋 サマリー ({timestamp})\n\n")
-                    f.write(f"{content}\n\n")
-                else:
-                    # ロール表示の調整
-                    if role == 'user':
-                        role_display = "👤 ユーザー"
-                    elif role == 'assistant':
-                        role_display = "🤖 アシスタント"
-                    else:
-                        role_display = f"⚙️ {role}"
-                    
-                    f.write(f"## {role_display} ({timestamp})\n\n")
-                    f.write(f"{content}\n\n")
-                    f.write("---\n\n")
+        # ファイルを登録してIDを取得
+        log_file_id = database.register_file(file_path)
         
-        print(f"変換完了: {output_file}")
-        print(f"処理したメッセージ数: {len(messages)}")
+        # 既存の会話データを削除
+        database.clear_conversations_for_file(log_file_id)
+        
+        # 会話データを登録
+        for msg in messages:
+            database.insert_conversation(
+                log_file_id,
+                msg['role'],
+                msg['timestamp'],
+                msg['content'],
+                filename
+            )
+        
+        print(f"  → {len(messages)}件の会話データを登録")
         return True
         
     except Exception as e:
-        print(f"ファイル書き込みエラー: {e}")
+        print(f"  → データベース登録エラー: {e}")
+        return False
+
+
+def export_conversations_to_json(database, output_file, start_date=None, end_date=None):
+    """会話データをJSON形式で出力"""
+    try:
+        conversations = database.get_conversations_in_range(start_date, end_date)
+        
+        # JSON形式で出力
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(conversations, f, ensure_ascii=False, indent=2)
+        
+        print(f"JSON出力完了: {output_file}")
+        print(f"出力した会話データ: {len(conversations)}件")
+        return True
+        
+    except Exception as e:
+        print(f"JSON出力エラー: {e}")
         return False
 
 
@@ -377,8 +442,8 @@ class Config:
         self.save_config()
 
 
-def find_log_files(log_directory=None):
-    """Claudeプロジェクト配下のJSONLファイルを検索"""
+def find_log_files(log_directory=None, start_date=None, end_date=None):
+    """Claudeプロジェクト配下のJSONLファイルを検索（ファイル更新日で絞り込み）"""
     if log_directory is None:
         log_directory = Path.home() / '.claude' / 'projects'
     
@@ -391,11 +456,42 @@ def find_log_files(log_directory=None):
         for file in files:
             if file.endswith('.jsonl'):
                 full_path = Path(root) / file
+                file_stat = full_path.stat()
+                file_modified = datetime.fromtimestamp(file_stat.st_mtime)
+                
+                # ファイル更新日による絞り込み
+                if start_date and file_modified < start_date:
+                    continue
+                if end_date and file_modified > end_date:
+                    continue
+                    
                 jsonl_files.append(full_path)
     
     # 更新日時でソート（新しい順）
     jsonl_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
     return jsonl_files
+
+
+def get_default_date_range():
+    """デフォルトの日付範囲を取得（直近1ヶ月前後、開始は01日）"""
+    now = datetime.now()
+    
+    # 今月の1日
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # 先月の1日
+    if now.month == 1:
+        last_month_start = current_month_start.replace(year=now.year-1, month=12)
+    else:
+        last_month_start = current_month_start.replace(month=now.month-1)
+    
+    # 来月の1日
+    if now.month == 12:
+        next_month_start = current_month_start.replace(year=now.year+1, month=1)
+    else:
+        next_month_start = current_month_start.replace(month=now.month+1)
+    
+    return last_month_start, next_month_start
 
 
 def select_log_file(files):
@@ -432,65 +528,27 @@ def select_log_file(files):
             return None
 
 
-def process_multiple_files(files, config, processed_info, info_file, username=None, date_filter=None):
-    """複数ファイルを一括処理"""
+def process_multiple_files_to_database(files, database):
+    """複数ファイルをデータベースに一括処理"""
     processed_count = 0
     skipped_count = 0
-    filtered_count = 0
-    
-    output_directory = config.get_output_directory()
-    skip_unchanged = config.get_skip_unchanged()
-    
-    # ユーザー名が指定されていない場合は設定から取得
-    if username is None:
-        username = config.get_username()
-    
-    # 日付フィルタが指定されていない場合は設定から取得
-    if date_filter is None:
-        date_filter = config.get_date_filter()
     
     for file in files:
-        if skip_unchanged and not should_process_file(file, processed_info):
-            print(f"スキップ（未変更）: {file.name}")
+        print(f"処理中: {file.name}")
+        
+        # ファイルが変更されているかチェック
+        if not database.is_file_changed(file):
+            print(f"  → スキップ（未変更）")
             skipped_count += 1
             continue
         
-        output_file = generate_output_filename(file, output_directory, username)
-        
-        # 日付フィルタが設定されている場合の表示
-        if date_filter and date_filter.is_active():
-            print(f"処理中（日付フィルタ適用）: {file.name} → {output_file.name}")
-        else:
-            print(f"処理中: {file.name} → {output_file.name}")
-        
-        success = convert_log_to_markdown(file, output_file, date_filter)
+        success = process_log_file_to_database(file, database)
         if success:
-            # 出力ファイルが空でないかチェック
-            if output_file.exists() and output_file.stat().st_size > 100:  # ヘッダーのみでないかチェック
-                # 処理済み情報を更新
-                processed_info[file.name] = {
-                    'mtime': file.stat().st_mtime,
-                    'output_file': str(output_file),
-                    'processed_at': datetime.now(timezone(timedelta(hours=9))).isoformat(),
-                    'date_filter': f"{date_filter.start_date}~{date_filter.end_date}" if date_filter and date_filter.is_active() else None
-                }
-                processed_count += 1
-            else:
-                print(f"  → 日付フィルタにより除外されました")
-                filtered_count += 1
-                # 空のファイルは削除
-                if output_file.exists():
-                    output_file.unlink()
+            processed_count += 1
         else:
-            print(f"エラー: {file.name} の処理に失敗")
+            print(f"  → エラー: {file.name} の処理に失敗")
     
-    # 処理済み情報を保存
-    save_processed_files_info(info_file, processed_info)
-    
-    if date_filter and date_filter.is_active():
-        print(f"\n処理完了: {processed_count}件, スキップ: {skipped_count}件, フィルタ除外: {filtered_count}件")
-    else:
-        print(f"\n処理完了: {processed_count}件, スキップ: {skipped_count}件")
+    print(f"\n処理完了: {processed_count}件, スキップ: {skipped_count}件")
     return processed_count > 0
 
 
@@ -498,117 +556,85 @@ def main():
     """メイン関数"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='会話ログをMarkdownに変換')
-    parser.add_argument('input_file', nargs='?', help='入力ログファイル（省略時は自動検索）')
-    parser.add_argument('-o', '--output', help='出力Markdownファイル')
-    parser.add_argument('--list', action='store_true', help='利用可能なログファイルを一覧表示')
+    parser = argparse.ArgumentParser(description='会話ログをSQLiteデータベースに登録・JSON出力')
+    parser.add_argument('--output', '-o', help='JSON出力ファイル（デフォルト: conversations.json）')
+    parser.add_argument('--list', action='store_true', help='データベース内の会話データを一覧表示')
     parser.add_argument('--config', help='設定ファイルパス')
-    parser.add_argument('--all', action='store_true', help='全てのファイルを処理（デフォルト制限を無視）')
-    parser.add_argument('--force', action='store_true', help='未変更でも強制処理')
-    parser.add_argument('--username', '-u', help='出力ファイル名に使用するユーザー名')
-    parser.add_argument('--start-date', help='開始日（YYYY-MM-DD形式）')
-    parser.add_argument('--end-date', help='終了日（YYYY-MM-DD形式）')
-    parser.add_argument('--set-date-range', action='store_true', help='日付範囲を設定ファイルに保存')
+    parser.add_argument('--force', action='store_true', help='全ファイル強制再処理')
+    parser.add_argument('--start-date', help='開始日（YYYY-MM-DD形式、ファイル更新日基準）')
+    parser.add_argument('--end-date', help='終了日（YYYY-MM-DD形式、ファイル更新日基準）')
+    parser.add_argument('--json-start-date', help='JSON出力の開始日（YYYY-MM-DD形式、会話日時基準）')
+    parser.add_argument('--json-end-date', help='JSON出力の終了日（YYYY-MM-DD形式、会話日時基準）')
+    parser.add_argument('--db-path', help='データベースファイルパス（デフォルト: log_data.db）')
     
     args = parser.parse_args()
     
     # 設定読み込み
     config = Config(args.config or 'log_converter_config.ini')
     
-    # 日付範囲設定の保存
-    if args.set_date_range:
-        start_date = args.start_date or ''
-        end_date = args.end_date or ''
-        config.set_date_range(start_date, end_date)
-        print(f"日付範囲を設定しました: {start_date} 〜 {end_date}")
-        return
+    # データベース初期化
+    database = LogDatabase(args.db_path or 'log_data.db')
     
-    # 日付フィルタの作成
-    date_filter = None
-    if args.start_date or args.end_date:
-        # コマンドライン引数から日付フィルタ作成
-        date_filter = DateFilter(args.start_date, args.end_date)
-        print(f"日付フィルタ: {args.start_date or '開始日なし'} 〜 {args.end_date or '終了日なし'}")
-    else:
-        # 設定ファイルから日付フィルタ取得
-        date_filter = config.get_date_filter()
-        if date_filter and date_filter.is_active():
-            start_str = date_filter.start_date.strftime('%Y-%m-%d') if date_filter.start_date else '開始日なし'
-            end_str = date_filter.end_date.strftime('%Y-%m-%d') if date_filter.end_date else '終了日なし'
-            print(f"設定ファイルの日付フィルタを使用: {start_str} 〜 {end_str}")
-    
-    # 処理済みファイル情報
-    info_file = Path('processed_files.json')
-    processed_info = load_processed_files_info(info_file)
-    
-    # ファイル一覧表示モード
+    # データベース内容一覧表示モード
     if args.list:
-        files = find_log_files(config.get_log_directory())
-        if files:
-            print("利用可能なJSONLファイル:")
-            for i, file in enumerate(files, 1):
-                try:
-                    rel_path = file.relative_to(config.get_log_directory())
-                except ValueError:
-                    rel_path = file
-                file_size = file.stat().st_size
-                mod_time = datetime.fromtimestamp(file.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-                status = "処理済み" if not should_process_file(file, processed_info) else "未処理"
-                print(f"{i:2d}: {rel_path} ({file_size:,} bytes, 更新: {mod_time}, {status})")
-        else:
-            print("JSONLファイルが見つかりませんでした。")
+        conversations = database.get_conversations_in_range()
+        print(f"データベース内の会話データ: {len(conversations)}件")
+        
+        if conversations:
+            print("\n最新10件:")
+            for conv in conversations[-10:]:
+                timestamp = conv['timestamp'][:19] if len(conv['timestamp']) > 19 else conv['timestamp']
+                print(f"  {timestamp} [{conv['role']}] {conv['content'][:50]}...")
         return
     
-    # 入力ファイルの決定
-    if args.input_file:
-        input_file = Path(args.input_file)
-        if not input_file.exists():
-            print(f"ファイルが見つかりません: {input_file}")
-            exit(1)
-        
-        # 単一ファイル処理
-        username = args.username or config.get_username()
-        if args.output:
-            output_file = Path(args.output)
-        else:
-            output_file = generate_output_filename(input_file, config.get_output_directory(), username)
-        
-        if not args.force and config.get_skip_unchanged() and not should_process_file(input_file, processed_info):
-            print(f"スキップ（未変更）: {input_file.name}")
-            print("強制処理する場合は --force オプションを使用してください。")
-            return
-        
-        success = convert_log_to_markdown(input_file, output_file, date_filter)
-        if success:
-            processed_info[input_file.name] = {
-                'mtime': input_file.stat().st_mtime,
-                'output_file': str(output_file),
-                'processed_at': datetime.now(timezone(timedelta(hours=9))).isoformat(),
-                'date_filter': f"{date_filter.start_date}~{date_filter.end_date}" if date_filter and date_filter.is_active() else None
-            }
-            save_processed_files_info(info_file, processed_info)
-        if not success:
-            exit(1)
+    # 日付範囲の決定（ファイル更新日基準）
+    start_date = None
+    end_date = None
+    
+    if args.start_date or args.end_date:
+        # コマンドライン引数指定
+        if args.start_date:
+            start_date = datetime.strptime(args.start_date, '%Y-%m-%d')
+        if args.end_date:
+            end_date = datetime.strptime(args.end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        print(f"ファイル更新日フィルタ: {args.start_date or '開始日なし'} 〜 {args.end_date or '終了日なし'}")
     else:
-        # 自動検索・一括処理
-        files = find_log_files(config.get_log_directory())
-        if not files:
-            print("JSONLファイルが見つかりませんでした。")
-            exit(1)
-        
-        # 処理対象ファイル数の制限
-        if not args.all:
-            max_files = config.get_max_files()
-            files = files[:max_files]
-            print(f"最新{len(files)}件のファイルを処理対象にします。")
-        
-        # 強制処理モードの場合
-        if args.force:
-            processed_info = {}  # 処理済み情報をクリア
-        
-        success = process_multiple_files(files, config, processed_info, info_file, args.username, date_filter)
-        if not success:
-            exit(1)
+        # デフォルト範囲（直近1ヶ月前後）
+        start_date, end_date = get_default_date_range()
+        print(f"デフォルト範囲を使用: {start_date.strftime('%Y-%m-%d')} 〜 {end_date.strftime('%Y-%m-%d')}")
+    
+    # ログファイルの検索・処理
+    files = find_log_files(config.get_log_directory(), start_date, end_date)
+    if not files:
+        print("対象のJSONLファイルが見つかりませんでした。")
+        exit(1)
+    
+    print(f"見つかったファイル: {len(files)}件")
+    
+    # 強制処理モードの場合、データベースをクリア
+    if args.force:
+        print("強制処理モード: データベースをクリアします")
+        with sqlite3.connect(database.db_path) as conn:
+            conn.execute('DELETE FROM conversations')
+            conn.execute('DELETE FROM log_files')
+    
+    # ファイルをデータベースに処理
+    success = process_multiple_files_to_database(files, database)
+    if not success:
+        print("ファイル処理に失敗しました。")
+        exit(1)
+    
+    # JSON出力
+    output_file = args.output or 'conversations.json'
+    json_start = args.json_start_date
+    json_end = args.json_end_date
+    
+    if json_start or json_end:
+        print(f"JSON出力（会話日時フィルタ）: {json_start or '開始日なし'} 〜 {json_end or '終了日なし'}")
+    
+    success = export_conversations_to_json(database, output_file, json_start, json_end)
+    if not success:
+        exit(1)
 
 
 if __name__ == "__main__":
