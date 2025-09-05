@@ -1,5 +1,5 @@
 /**
- * UI管理クラス
+ * UI管理クラス（日付フィルター対応版）
  * ユーザーインターフェース操作を管理
  */
 
@@ -7,933 +7,581 @@ class UIManager {
     constructor() {
         this.elements = {};
         this.state = {
-            currentFile: null,
             currentMessages: [],
             theme: 'light',
             sidebarOpen: true,
             searchMode: false,
-            selectedFiles: new Set(),
-            multiFileMode: false,
-            currentPage: 1,
-            totalPages: 1,
-            perPage: 50,
-            totalMessageCount: 0
+            currentWeekStart: new Date(),
+            selectedDate: null,
         };
-        
+
         this.init();
     }
-    
+
     init() {
+        console.log('UIManager.init() 開始');
         this.cacheElements();
         this.bindEvents();
         this.loadTheme();
         this.updateStats();
-        
-        // 初期化完了
-        this.showWelcomeMessage();
+        this.setDateRangeRestrictions();
+        console.log('loadAllMessages() を呼び出します');
+        this.loadAllMessages();
+        console.log('UIManager.init() 完了');
     }
-    
+
     cacheElements() {
+        // DOM要素をキャッシュ
         this.elements = {
-            // ヘッダー
+            // ヘッダー要素
             searchInput: document.getElementById('searchInput'),
             searchBtn: document.getElementById('searchBtn'),
-            fileSelect: document.getElementById('fileSelect'),
+            searchLoading: document.getElementById('searchLoading'),
+            startDate: document.getElementById('startDate'),
+            endDate: document.getElementById('endDate'),
+            dateSearchBtn: document.getElementById('dateSearchBtn'),
+            clearSearchBtn: document.getElementById('clearSearchBtn'),
             fileStatus: document.getElementById('fileStatus'),
-            
-            // サイドバー
-            sidebar: document.getElementById('sidebar'),
-            toggleSidebar: document.getElementById('toggleSidebar'),
-            fileList: document.getElementById('fileList'),
-            buildCacheBtn: document.getElementById('buildCacheBtn'),
-            clearCacheBtn: document.getElementById('clearCacheBtn'),
-            
-            // メイン
+
+            // サイドバー要素（削除済み）
+
+            // メインエリア
             loading: document.getElementById('loading'),
             messageArea: document.getElementById('messageArea'),
             virtualScroller: document.getElementById('virtualScroller'),
+            pagination: document.getElementById('pagination'),
+
+            // 検索結果
             searchResults: document.getElementById('searchResults'),
             searchTitle: document.getElementById('searchTitle'),
             searchList: document.getElementById('searchList'),
             closeSearch: document.getElementById('closeSearch'),
-            
-            // ページネーション
-            pagination: document.getElementById('pagination'),
-            prevPage: document.getElementById('prevPage'),
-            nextPage: document.getElementById('nextPage'),
-            currentPage: document.getElementById('currentPage'),
-            totalPages: document.getElementById('totalPages'),
-            totalMessages: document.getElementById('totalMessages'),
-            messageRange: document.getElementById('messageRange'),
-            
+
             // フッター
-            stats: document.getElementById('stats'),
             messageCount: document.getElementById('messageCount'),
             cacheStatus: document.getElementById('cacheStatus'),
             loadTime: document.getElementById('loadTime'),
             themeToggle: document.getElementById('themeToggle'),
-            
+
             // モーダル
             modal: document.getElementById('modal'),
             modalTitle: document.getElementById('modalTitle'),
             modalBody: document.getElementById('modalBody'),
             modalClose: document.getElementById('modalClose'),
-            
+
             // 通知
-            notifications: document.getElementById('notifications')
+            notifications: document.getElementById('notifications'),
         };
     }
-    
+
     bindEvents() {
-        // 検索
-        this.elements.searchBtn.addEventListener('click', () => this.handleSearch());
-        this.elements.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handleSearch();
-        });
-        this.elements.closeSearch.addEventListener('click', () => this.hideSearchResults());
-        
-        // ファイル選択
-        this.elements.fileSelect.addEventListener('change', (e) => this.handleFileSelect(e.target.value));
-        
-        // サイドバー
-        this.elements.toggleSidebar.addEventListener('click', () => this.toggleSidebar());
-        this.elements.buildCacheBtn.addEventListener('click', () => this.handleBuildCache());
-        this.elements.clearCacheBtn.addEventListener('click', () => this.handleClearCache());
-        
-        // テーマ切り替え
-        this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
-        
-        // モーダル
-        this.elements.modalClose.addEventListener('click', () => this.hideModal());
-        this.elements.modal.addEventListener('click', (e) => {
-            if (e.target === this.elements.modal) this.hideModal();
-        });
-        
-        // ページネーション
-        this.elements.prevPage.addEventListener('click', () => this.goToPreviousPage());
-        this.elements.nextPage.addEventListener('click', () => this.goToNextPage());
-        
-        // キーボードショートカット
-        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
-        
-        // レスポンシブ対応
-        window.addEventListener('resize', () => this.handleResize());
-    }
-    
-    async loadFileList() {
-        try {
-            this.showLoading('ファイル一覧を読み込み中...');
-            
-            const data = await apiClient.getFiles();
-            
-            // ファイル選択肢更新
-            this.updateFileSelect(data.files);
-            
-            // サイドバーファイル一覧更新
-            this.updateFileList(data.files);
-            
-            this.updateFileStatus(`${data.total}ファイル`);
-            
-        } catch (error) {
-            this.showNotification('ファイル一覧の取得に失敗しました: ' + error.message, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-    
-    updateFileSelect(files) {
-        const select = this.elements.fileSelect;
-        select.innerHTML = '<option value="">ファイルを選択...</option>';
-        
-        files.forEach(file => {
-            const option = document.createElement('option');
-            option.value = file.path;
-            option.textContent = file.name;
-            if (file.is_cached) {
-                option.textContent += ' ⚡';
-            }
-            select.appendChild(option);
-        });
-    }
-    
-    updateFileList(files) {
-        const list = this.elements.fileList;
-        list.innerHTML = '';
-        
-        files.forEach(file => {
-            const item = document.createElement('div');
-            item.className = 'file-item';
-            item.dataset.path = file.path;
-            
-            const size = this.formatFileSize(file.size);
-            const date = this.formatDate(file.modified * 1000);
-            const cacheIcon = file.is_cached ? '⚡' : '📄';
-            
-            item.innerHTML = `
-                <div class="file-header">
-                    <input type="checkbox" class="file-checkbox" id="checkbox-${file.path}" data-path="${file.path}">
-                    <span class="file-icon">${cacheIcon}</span>
-                    <span class="file-name">${file.name}</span>
-                </div>
-                <div class="file-meta">
-                    <span class="file-size">${size}</span>
-                    <span class="file-date">${date}</span>
-                </div>
-            `;
-            
-            // チェックボックスのイベントハンドラー
-            const checkbox = item.querySelector('.file-checkbox');
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                this.handleFileCheckboxChange(file.path, checkbox.checked);
-            });
-            
-            // ファイル名クリックでの単一選択
-            const fileName = item.querySelector('.file-name');
-            fileName.addEventListener('click', () => this.handleFileSelect(file.path));
-            
-            list.appendChild(item);
-        });
-    }
-    
-    async handleFileSelect(filePath) {
-        console.log('ファイル選択:', filePath);
-        
-        if (!filePath) {
-            console.log('ファイルパスが空です');
-            return;
-        }
-        
-        // 既に同じファイルが選択されている場合はスキップ
-        if (this.state.currentFile === filePath) {
-            console.log('同じファイルが既に選択されています:', filePath);
-            return;
-        }
-        
-        // ページネーション状態をリセット
-        this.state.currentFile = filePath;
-        this.state.currentPage = 1;
-        this.state.multiFileMode = false;
-        
-        // ファイル名を取得してステータス表示
-        const fileName = filePath.split('/').pop() || filePath;
-        this.updateFileStatus(`${fileName}を読み込み中...`);
-        
-        // 新しいloadSingleFileメソッドを使用
-        await this.loadSingleFile(filePath);
-    }
-    
-    showMessages(messages) {
-        console.log('showMessages呼び出し:', messages?.length || 0, 'メッセージ');
-        
-        // Welcome メッセージを非表示
-        this.elements.messageArea.style.display = 'none';
-        this.elements.virtualScroller.classList.remove('hidden');
-        
-        // シンプルなメッセージ表示
-        const scrollContent = document.getElementById('scrollContent');
-        if (!scrollContent) {
-            console.error('scrollContent要素が見つかりません');
-            return;
-        }
-        
-        // 既存のコンテンツをクリア
-        scrollContent.innerHTML = '';
-        
-        // メッセージを直接レンダリング
-        messages.forEach((message, index) => {
-            // 全体でのメッセージ番号を計算
-            const globalIndex = (this.state.currentPage - 1) * this.state.perPage + index;
-            const messageElement = this.createMessageElement(message, globalIndex);
-            scrollContent.appendChild(messageElement);
-        });
-        
-        this.state.searchMode = false;
-        console.log('メッセージ表示完了');
-    }
-    
-    async handleSearch() {
-        const query = this.elements.searchInput.value.trim();
-        if (!query) {
-            this.clearSearchHighlights();
-            return;
-        }
-        
-        try {
-            this.showLoading('検索中...');
-            
-            // 現在のファイルのメッセージから検索
-            if (!this.state.currentMessages) {
-                this.showNotification('まずファイルを選択してください', 'warning');
-                return;
-            }
-            
-            this.performInPageSearch(query);
-            
-        } catch (error) {
-            this.showNotification('検索に失敗しました: ' + error.message, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-    
-    showSearchResults(results, query) {
-        this.elements.searchTitle.textContent = `検索結果: "${query}" (${results.length}件)`;
-        
-        const list = this.elements.searchList;
-        list.innerHTML = '';
-        
-        results.forEach((result, index) => {
-            const item = document.createElement('div');
-            item.className = 'search-result-item';
-            
-            const snippet = this.createSearchSnippet(result.content, query);
-            const roleIcon = this.getRoleIcon(result.role);
-            
-            item.innerHTML = `
-                <div class="result-header">
-                    <span class="result-role">${roleIcon} ${result.role}</span>
-                    <span class="result-timestamp">${result.timestamp}</span>
-                    <span class="result-file">${result.file_path}</span>
-                </div>
-                <div class="result-content">${snippet}</div>
-            `;
-            
-            item.addEventListener('click', () => {
-                if (result.file_path !== this.state.currentFile) {
-                    this.handleFileSelect(result.file_path);
+        // 検索関連
+        if (this.elements.searchInput) {
+            this.elements.searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleSearch();
                 }
-                // TODO: 該当メッセージにスクロール
             });
-            
-            list.appendChild(item);
+        }
+
+        if (this.elements.searchBtn) {
+            this.elements.searchBtn.addEventListener('click', () => {
+                this.handleSearch();
+            });
+        }
+
+        // 日付検索（ヘッダー）
+        if (this.elements.dateSearchBtn) {
+            this.elements.dateSearchBtn.addEventListener('click', () => {
+                this.handleDateSearch();
+            });
+        }
+
+        // 検索条件クリア
+        if (this.elements.clearSearchBtn) {
+            this.elements.clearSearchBtn.addEventListener('click', () => {
+                this.clearSearchConditions();
+            });
+        }
+
+        // サイドバー関連処理は削除済み
+
+        // 検索結果を閉じる
+        if (this.elements.closeSearch) {
+            this.elements.closeSearch.addEventListener('click', () => {
+                this.hideSearchResults();
+            });
+        }
+
+        // テーマ切り替え
+        if (this.elements.themeToggle) {
+            this.elements.themeToggle.addEventListener('click', () => {
+                this.toggleTheme();
+            });
+        }
+
+        // モーダル
+        if (this.elements.modalClose) {
+            this.elements.modalClose.addEventListener('click', () => {
+                this.hideModal();
+            });
+        }
+
+        if (this.elements.modal) {
+            this.elements.modal.addEventListener('click', (e) => {
+                if (e.target === this.elements.modal) {
+                    this.hideModal();
+                }
+            });
+        }
+    }
+
+    // サイドバー関連メソッドは削除済み
+
+    // ヘッダーの日付検索
+    handleDateSearch() {
+        const startDate = this.elements.startDate?.value;
+        const endDate = this.elements.endDate?.value;
+
+        if (!startDate || !endDate) {
+            this.showNotification(
+                '開始日と終了日の両方を選択してください',
+                'warning'
+            );
+            return;
+        }
+
+        // サイドバーの日付フィルターにも設定
+        if (this.elements.filterStartDate)
+            this.elements.filterStartDate.value = startDate;
+        if (this.elements.filterEndDate)
+            this.elements.filterEndDate.value = endDate;
+
+        this.loadMessagesByDateRange(startDate, endDate);
+    }
+
+    // 日付範囲でメッセージを読み込み（会話ログの日時で検索）
+    async loadMessagesByDateRange(startDate, endDate) {
+        try {
+            this.showLoading('メッセージを読み込み中...');
+
+            const response = await fetch(
+                `/api/search/date-range?start_date=${startDate}&end_date=${endDate}&limit=5000`
+            );
+            console.log(
+                '🚀 ~ UIManager ~ loadMessagesByDateRange ~ endDate:',
+                endDate
+            );
+            console.log(
+                '🚀 ~ UIManager ~ loadMessagesByDateRange ~ startDate:',
+                startDate
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                this.displayMessages(data.results);
+                this.updateStats({
+                    messageCount: data.total,
+                    dateRange: `${startDate} 〜 ${endDate}`,
+                });
+                this.showNotification(
+                    `${data.total}件のメッセージを表示しました`,
+                    'success'
+                );
+            } else {
+                throw new Error(data.error || '日付範囲検索に失敗しました');
+            }
+        } catch (error) {
+            console.error('Date range search error:', error);
+            this.showNotification(error.message, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    displayMessages(messages) {
+        if (!this.elements.messageArea || !messages || messages.length === 0) {
+            if (this.elements.messageArea) {
+                this.elements.messageArea.innerHTML =
+                    '<div class="empty-state">指定した日付範囲にメッセージが見つかりません</div>';
+            }
+            return;
+        }
+
+        this.elements.messageArea.innerHTML = '';
+        this.elements.messageArea.style.display = 'block';
+        if (this.elements.virtualScroller) {
+            this.elements.virtualScroller.classList.add('hidden');
+        }
+
+        // チャット用のメッセージリストコンテナを作成
+        const chatContainer = document.createElement('div');
+        chatContainer.className = 'chat-container';
+
+        // メッセージを時系列順に表示（古い順）
+        messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        messages.forEach((message, index) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${message.role}`;
+
+            // 日時をyyyy/MM/dd HH:mm:ss形式に変換
+            const timestamp = new Date(message.timestamp).toLocaleString(
+                'ja-JP',
+                {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                }
+            );
+
+            // アイコンと表示名
+            const icon = message.role === 'user' ? '👤' : '🤖';
+            const roleName =
+                message.role === 'user' ? 'ユーザー' : 'アシスタント';
+            const messageNumber = index + 1;
+
+            messageDiv.innerHTML = `
+                <div class="message-avatar">
+                    <span class="avatar-icon">${icon}</span>
+                </div>
+                <div class="message-bubble">
+                    <div class="message-header">
+                        <span class="message-info">
+                            <span class="message-number">#${messageNumber}</span>
+                            <span class="message-role">${roleName}</span>
+                        </span>
+                        <span class="message-timestamp">${timestamp}</span>
+                    </div>
+                    <div class="message-content">${this.formatMessageContent(
+                        message.content
+                    )}</div>
+                </div>
+            `;
+
+            chatContainer.appendChild(messageDiv);
         });
-        
-        this.elements.searchResults.classList.remove('hidden');
-        this.state.searchMode = true;
+
+        this.elements.messageArea.appendChild(chatContainer);
+
+        // 最後のメッセージまでスクロール
+        setTimeout(() => {
+            this.elements.messageArea.scrollTop =
+                this.elements.messageArea.scrollHeight;
+        }, 100);
+
+        this.state.currentMessages = messages;
     }
-    
-    hideSearchResults() {
-        this.elements.searchResults.classList.add('hidden');
-        this.state.searchMode = false;
-    }
-    
-    createSearchSnippet(content, query) {
-        const maxLength = 200;
-        const index = content.toLowerCase().indexOf(query.toLowerCase());
-        
-        if (index === -1) {
-            return this.escapeHtml(content.substring(0, maxLength)) + '...';
+
+    // その他のヘルパーメソッド
+    showWelcomeMessage() {
+        if (this.elements.messageArea) {
+            this.elements.messageArea.innerHTML = `
+                <div class="welcome-message">
+                    <h2>Claude Log Viewer へようこそ</h2>
+                    <p>すべての会話ログが表示されます。左側の日付ボタンでも確認できます。</p>
+                    <div class="features">
+                        <div class="feature">
+                            <h3>⚡ 高速読み込み</h3>
+                            <p>SQLiteキャッシュによる超高速表示</p>
+                        </div>
+                        <div class="feature">
+                            <h3>🔍 高速検索</h3>
+                            <p>全文検索で瞬時に目的の会話を発見</p>
+                        </div>
+                        <div class="feature">
+                            <h3>📱 レスポンシブ</h3>
+                            <p>デスクトップ・モバイルどちらでも快適</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            this.elements.messageArea.style.display = 'block';
         }
-        
-        const start = Math.max(0, index - 50);
-        const end = Math.min(content.length, index + query.length + 50);
-        
-        let snippet = content.substring(start, end);
-        if (start > 0) snippet = '...' + snippet;
-        if (end < content.length) snippet = snippet + '...';
-        
-        // ハイライト
-        const regex = new RegExp(`(${this.escapeRegex(query)})`, 'gi');
-        snippet = this.escapeHtml(snippet).replace(regex, '<mark>$1</mark>');
-        
-        return snippet;
+        if (this.elements.virtualScroller) {
+            this.elements.virtualScroller.classList.add('hidden');
+        }
     }
-    
-    async handleBuildCache() {
+
+    formatDate(dateStr) {
         try {
-            const data = await apiClient.buildCache();
-            this.showNotification(data.message, 'success');
-            this.loadFileList(); // ファイル一覧を再読み込み
-        } catch (error) {
-            this.showNotification('キャッシュ作成に失敗しました: ' + error.message, 'error');
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+            });
+        } catch (e) {
+            return dateStr;
         }
     }
-    
-    async handleClearCache() {
-        if (!confirm('すべてのキャッシュを削除しますか？')) return;
-        
-        try {
-            const data = await apiClient.clearCache();
-            this.showNotification(data.message, 'success');
-            this.loadFileList(); // ファイル一覧を再読み込み
-        } catch (error) {
-            this.showNotification('キャッシュ削除に失敗しました: ' + error.message, 'error');
+
+    formatMessageContent(content) {
+        if (!content) return '';
+
+        // 改行を<br>に変換
+        content = content.replace(/\n/g, '<br>');
+
+        // URLリンク化
+        content = content.replace(
+            /(https?:\/\/[^\s]+)/g,
+            '<a href="$1" target="_blank">$1</a>'
+        );
+
+        return content;
+    }
+
+    // UI状態管理
+    showLoading(message = '読み込み中...') {
+        if (this.elements.loading) {
+            this.elements.loading.querySelector('p').textContent = message;
+            this.elements.loading.classList.remove('hidden');
         }
     }
-    
-    toggleSidebar() {
-        this.state.sidebarOpen = !this.state.sidebarOpen;
-        
-        if (this.state.sidebarOpen) {
-            this.elements.sidebar.classList.remove('collapsed');
-            this.elements.toggleSidebar.textContent = '←';
-        } else {
-            this.elements.sidebar.classList.add('collapsed');
-            this.elements.toggleSidebar.textContent = '→';
+
+    hideLoading() {
+        if (this.elements.loading) {
+            this.elements.loading.classList.add('hidden');
         }
     }
-    
+
+    showSearchLoading(message = '検索中...') {
+        if (this.elements.searchLoading) {
+            const textElement = this.elements.searchLoading.querySelector(
+                '.search-loading-text'
+            );
+            if (textElement) {
+                textElement.textContent = message;
+            }
+            this.elements.searchLoading.classList.add('active');
+        }
+    }
+
+    hideSearchLoading() {
+        if (this.elements.searchLoading) {
+            this.elements.searchLoading.classList.remove('active');
+        }
+    }
+
+    showNotification(message, type = 'info') {
+        if (!this.elements.notifications) return;
+
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+
+        this.elements.notifications.appendChild(notification);
+
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+
+    updateStats(stats = {}) {
+        if (this.elements.messageCount) {
+            this.elements.messageCount.textContent = `メッセージ: ${
+                stats.messageCount || 0
+            }`;
+        }
+
+        if (this.elements.cacheStatus && stats.dateRange) {
+            this.elements.cacheStatus.textContent = `範囲: ${stats.dateRange}`;
+        }
+
+        if (this.elements.loadTime) {
+            this.elements.loadTime.textContent = `読み込み時間: ${new Date().toLocaleTimeString()}`;
+        }
+    }
+
+    // toggleSidebar method removed
+
     toggleTheme() {
         this.state.theme = this.state.theme === 'light' ? 'dark' : 'light';
-        document.body.dataset.theme = this.state.theme;
-        
-        this.elements.themeToggle.textContent = this.state.theme === 'light' ? '🌙' : '☀️';
-        
+        document.documentElement.setAttribute('data-theme', this.state.theme);
         localStorage.setItem('theme', this.state.theme);
+
+        if (this.elements.themeToggle) {
+            this.elements.themeToggle.textContent =
+                this.state.theme === 'light' ? '🌙' : '☀️';
+        }
     }
-    
+
     loadTheme() {
         const savedTheme = localStorage.getItem('theme') || 'light';
         this.state.theme = savedTheme;
-        document.body.dataset.theme = savedTheme;
-        this.elements.themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        if (this.elements.themeToggle) {
+            this.elements.themeToggle.textContent =
+                savedTheme === 'light' ? '🌙' : '☀️';
+        }
     }
-    
-    showLoading(message = '読み込み中...') {
-        this.elements.loading.querySelector('p').textContent = message;
-        this.elements.loading.classList.remove('hidden');
-    }
-    
-    hideLoading() {
-        this.elements.loading.classList.add('hidden');
-    }
-    
-    showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-        
-        this.elements.notifications.appendChild(notification);
-        
-        // アニメーション
-        setTimeout(() => notification.classList.add('show'), 100);
-        
-        // 自動削除
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
-        }, 4000);
-    }
-    
-    showModal(title, content) {
-        this.elements.modalTitle.textContent = title;
-        this.elements.modalBody.innerHTML = content;
-        this.elements.modal.classList.remove('hidden');
-    }
-    
+
     hideModal() {
-        this.elements.modal.classList.add('hidden');
-    }
-    
-    showWelcomeMessage() {
-        this.elements.messageArea.style.display = 'block';
-        this.elements.virtualScroller.classList.add('hidden');
-    }
-    
-    updateStats(messageCount = 0, loadTime = 0) {
-        this.elements.messageCount.textContent = `メッセージ: ${messageCount}`;
-        this.elements.loadTime.textContent = `読み込み時間: ${loadTime}ms`;
+        if (this.elements.modal) {
+            this.elements.modal.classList.add('hidden');
+        }
     }
 
-    createMessageElement(message, index) {
-        const div = document.createElement('div');
-        div.className = `message ${message.role === 'user' ? 'message-user' : 'message-assistant'}`;
-        div.innerHTML = this.formatMessageHTML(message, index);
-        return div;
+    hideSearchResults() {
+        if (this.elements.searchResults) {
+            this.elements.searchResults.classList.add('hidden');
+        }
+        this.state.searchMode = false;
     }
 
-    formatMessageHTML(message, index) {
-        const roleIcon = message.role === 'user' ? '👤' : '🤖';
-        const roleName = message.role === 'user' ? 'User' : 'Assistant';
-        const messageNumber = index + 1; // 1から始まる番号
-        
-        // タイムスタンプを適切に処理
-        let timestamp = message.timestamp;
-        if (timestamp) {
-            // 既にJST形式の文字列の場合はそのまま使用
-            if (typeof timestamp === 'string' && timestamp.includes('JST')) {
-                timestamp = timestamp.replace(' JST', '');
+    // 全メッセージ表示
+    async loadAllMessages() {
+        try {
+            console.log('loadAllMessages() が呼び出されました');
+            this.showLoading('すべてのメッセージを読み込み中...');
+
+            // まず利用可能な日付範囲を取得
+            const dateRangeResponse = await fetch('/api/date-range');
+            const dateRangeData = await dateRangeResponse.json();
+
+            if (
+                !dateRangeData.success ||
+                !dateRangeData.min_date ||
+                !dateRangeData.max_date
+            ) {
+                throw new Error('日付範囲の取得に失敗しました');
+            }
+
+            // 全データを取得（実際のデータベースの全日付範囲）
+            const response = await fetch(
+                `/api/search/date-range?start_date=${dateRangeData.min_date}&end_date=${dateRangeData.max_date}&limit=5000`
+            );
+            console.log('API response received:', response.status);
+            const data = await response.json();
+            console.log('API data parsed:', data.success, 'total:', data.total);
+
+            if (data.success) {
+                this.displayMessages(data.results);
+                this.updateStats({
+                    messageCount: data.total,
+                    dateRange: 'すべて',
+                });
+                this.showNotification(
+                    `${data.total}件のメッセージを表示しました`,
+                    'success'
+                );
             } else {
-                // ISO形式の場合は日本語形式に変換
-                try {
-                    const date = new Date(timestamp);
-                    timestamp = date.toLocaleString('ja-JP', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        timeZone: 'Asia/Tokyo'
-                    });
-                } catch (e) {
-                    console.warn('日時解析エラー:', timestamp, e);
-                    timestamp = String(timestamp);
-                }
+                throw new Error(
+                    data.error || 'メッセージの読み込みに失敗しました'
+                );
             }
-        } else {
-            timestamp = '不明';
-        }
-        
-        // ソースファイル表示（複数ファイルモードの場合）
-        const sourceFileDisplay = this.state.multiFileMode && message.sourceFile 
-            ? `<span class="source-file">[${message.sourceFile}]</span>` 
-            : '';
-        
-        // コンテンツを処理
-        let content = this.escapeHtml(message.content);
-        content = this.processCodeBlocks(content);
-        
-        // メッセージ全体のテキストをエスケープしてdata属性に格納
-        const messageText = `${roleName}: ${message.content}`;
-        const escapedMessageText = messageText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        
-        return `
-            <div class="message-header">
-                <div class="message-role">
-                    <span class="message-number">#${messageNumber}</span>
-                    <span class="role-icon">${roleIcon}</span>
-                    <span class="role-name">${roleName}</span>
-                    ${sourceFileDisplay}
-                </div>
-                <div class="message-actions">
-                    <button class="copy-message-btn" onclick="copyMessageToClipboard(this)" data-message="${escapedMessageText}" title="メッセージをコピー">
-                        📋 コピー
-                    </button>
-                    <div class="message-timestamp">${timestamp}</div>
-                </div>
-            </div>
-            <div class="message-content">
-                ${content}
-            </div>
-        `;
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    processCodeBlocks(content) {
-        return content.replace(/```(\w+)?\n([\s\S]*?)\n```/g, (match, language, code) => {
-            const lang = language || 'text';
-            const escapedCode = this.escapeHtml(code);
-            const dataCodeEscaped = code.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            return `
-                <div class="code-block">
-                    <div class="code-header">
-                        <span class="code-language">${lang}</span>
-                        <button class="copy-btn" onclick="copyToClipboard(this)" data-code="${dataCodeEscaped}">
-                            📋 コピー
-                        </button>
-                    </div>
-                    <pre class="code-content"><code class="language-${lang}">${escapedCode}</code></pre>
-                </div>
-            `;
-        });
-    }
-    
-    updateFileStatus(status) {
-        this.elements.fileStatus.textContent = status;
-    }
-
-    performInPageSearch(query) {
-        // 既存のハイライトをクリア
-        this.clearSearchHighlights();
-        
-        // 検索結果を格納
-        this.searchResults = [];
-        this.currentSearchIndex = -1;
-        
-        const scrollContent = document.getElementById('scrollContent');
-        if (!scrollContent) return;
-        
-        const messages = scrollContent.querySelectorAll('.message');
-        
-        messages.forEach((messageElement, messageIndex) => {
-            const contentElement = messageElement.querySelector('.message-content');
-            if (!contentElement) return;
-            
-            const originalHTML = contentElement.innerHTML;
-            const textContent = contentElement.textContent || contentElement.innerText;
-            
-            // 大文字小文字を区別しない検索
-            const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-            
-            if (regex.test(textContent)) {
-                // ハイライト付きHTMLを作成
-                const highlightedHTML = originalHTML.replace(regex, '<mark class="search-highlight">$1</mark>');
-                contentElement.innerHTML = highlightedHTML;
-                
-                // 検索結果として追加
-                const highlights = contentElement.querySelectorAll('.search-highlight');
-                highlights.forEach((highlight, highlightIndex) => {
-                    this.searchResults.push({
-                        element: highlight,
-                        messageIndex: messageIndex,
-                        highlightIndex: highlightIndex
-                    });
-                });
-            }
-        });
-        
-        // 結果表示
-        if (this.searchResults.length > 0) {
-            this.showNotification(`"${query}" を ${this.searchResults.length} 箇所で見つけました。F3で次へ`, 'success');
-            this.jumpToNextSearchResult();
-        } else {
-            this.showNotification(`"${query}" は見つかりませんでした`, 'info');
-        }
-    }
-
-    clearSearchHighlights() {
-        // 既存のハイライトを削除
-        const highlights = document.querySelectorAll('.search-highlight');
-        highlights.forEach(highlight => {
-            const parent = highlight.parentNode;
-            parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
-            parent.normalize();
-        });
-        
-        this.searchResults = [];
-        this.currentSearchIndex = -1;
-        
-        // アクティブハイライトも削除
-        document.querySelectorAll('.search-highlight-active').forEach(el => {
-            el.classList.remove('search-highlight-active');
-        });
-    }
-
-    jumpToNextSearchResult() {
-        if (!this.searchResults || this.searchResults.length === 0) return;
-        
-        // 前のアクティブハイライトを削除
-        document.querySelectorAll('.search-highlight-active').forEach(el => {
-            el.classList.remove('search-highlight-active');
-        });
-        
-        // 次の結果に移動
-        this.currentSearchIndex = (this.currentSearchIndex + 1) % this.searchResults.length;
-        const result = this.searchResults[this.currentSearchIndex];
-        
-        // アクティブハイライトを設定
-        result.element.classList.add('search-highlight-active');
-        
-        // スクロールして表示
-        result.element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-        });
-        
-        // 現在位置を表示
-        this.showNotification(`検索結果 ${this.currentSearchIndex + 1}/${this.searchResults.length}`, 'info', 2000);
-    }
-    
-    updateActiveFile(filePath) {
-        // ファイル一覧のアクティブ表示
-        this.elements.fileList.querySelectorAll('.file-item').forEach(item => {
-            item.classList.remove('active');
-            if (item.dataset.path === filePath) {
-                item.classList.add('active');
-            }
-        });
-        
-        // ファイル選択肢の更新
-        this.elements.fileSelect.value = filePath;
-    }
-    
-    handleKeyboard(e) {
-        // Ctrl+F: 検索
-        if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            this.elements.searchInput.focus();
-        }
-        
-        // F3: 次の検索結果
-        if (e.key === 'F3') {
-            e.preventDefault();
-            if (this.searchResults && this.searchResults.length > 0) {
-                this.jumpToNextSearchResult();
-            }
-        }
-        
-        // Escape: モーダル・検索結果を閉じる
-        if (e.key === 'Escape') {
-            if (!this.elements.modal.classList.contains('hidden')) {
-                this.hideModal();
-            } else if (this.searchResults && this.searchResults.length > 0) {
-                this.clearSearchHighlights();
-                this.showNotification('検索を終了しました', 'info');
-            }
-        }
-    }
-    
-    handleResize() {
-        // モバイル対応
-        if (window.innerWidth < 768) {
-            this.elements.sidebar.classList.add('mobile');
-        } else {
-            this.elements.sidebar.classList.remove('mobile');
-        }
-    }
-    
-    // ヘルパーメソッド
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-    }
-    
-    formatDate(timestamp) {
-        return new Date(timestamp).toLocaleDateString('ja-JP', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-    
-    getRoleIcon(role) {
-        const icons = {
-            'user': '👤',
-            'assistant': '🤖',
-            'system': '⚙️',
-            'summary': '📋'
-        };
-        return icons[role] || '💬';
-    }
-    
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    escapeRegex(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-    
-    // チェックボックス状態管理
-    handleFileCheckboxChange(filePath, checked) {
-        if (checked) {
-            this.state.selectedFiles.add(filePath);
-        } else {
-            this.state.selectedFiles.delete(filePath);
-        }
-        
-        console.log('選択ファイル:', Array.from(this.state.selectedFiles));
-        
-        // 複数ファイルキャッシュをリセット
-        this.multiFileAllMessages = null;
-        this.state.currentPage = 1;
-        
-        // 選択ファイルが1つ以上の場合、複数ファイルモードに切り替え
-        if (this.state.selectedFiles.size > 0) {
-            this.loadMultipleFiles();
-        } else {
-            // 選択ファイルがない場合、ウェルカムメッセージを表示
-            this.showWelcomeMessage();
-        }
-    }
-    
-    async loadMultipleFiles() {
-        if (this.state.selectedFiles.size === 0) return;
-        
-        this.state.multiFileMode = true;
-        const fileList = Array.from(this.state.selectedFiles);
-        
-        try {
-            this.showLoading('複数ファイルを読み込み中...');
-            
-            // 初回のみ全データを取得してキャッシュ
-            if (!this.multiFileAllMessages) {
-                const allMessages = [];
-                for (const filePath of fileList) {
-                    // すべてのページを取得（perPageを大きな値に設定）
-                    const data = await apiClient.getMessages(filePath, 1, 10000);
-                    if (data.success && data.messages) {
-                        // ファイル情報をメッセージに追加
-                        const fileName = filePath.split('/').pop() || filePath;
-                        data.messages.forEach(msg => {
-                            msg.sourceFile = fileName;
-                            msg.sourceFilePath = filePath;
-                        });
-                        allMessages.push(...data.messages);
-                    }
-                }
-                
-                // 日時順でソート
-                allMessages.sort((a, b) => {
-                    const timeA = new Date(a.timestamp).getTime();
-                    const timeB = new Date(b.timestamp).getTime();
-                    return timeA - timeB;
-                });
-                
-                this.multiFileAllMessages = allMessages;
-            }
-            
-            // ページネーション情報を更新
-            this.state.totalMessageCount = this.multiFileAllMessages.length;
-            this.state.totalPages = Math.ceil(this.state.totalMessageCount / this.state.perPage);
-            
-            // 現在のページのメッセージを取得
-            const startIndex = (this.state.currentPage - 1) * this.state.perPage;
-            const endIndex = startIndex + this.state.perPage;
-            const currentPageMessages = this.multiFileAllMessages.slice(startIndex, endIndex);
-            
-            // 表示
-            this.showMessages(currentPageMessages);
-            this.updatePagination();
-            this.updateFileStatus(`${fileList.length}ファイル選択中 (${this.state.totalMessageCount}メッセージ)`);
-            
         } catch (error) {
-            console.error('複数ファイル読み込みエラー:', error);
-            this.showNotification('複数ファイルの読み込みに失敗しました: ' + error.message, 'error');
+            console.error('Load all messages error:', error);
+            this.showNotification(error.message, 'error');
+            if (this.elements.messageArea) {
+                this.elements.messageArea.innerHTML =
+                    '<div class="empty-state">データの読み込みに失敗しました</div>';
+            }
         } finally {
             this.hideLoading();
         }
     }
-    
-    // ページネーション関連メソッド
-    updatePagination() {
-        this.elements.currentPage.textContent = this.state.currentPage;
-        this.elements.totalPages.textContent = this.state.totalPages;
-        this.elements.totalMessages.textContent = this.state.totalMessageCount;
-        
-        const start = (this.state.currentPage - 1) * this.state.perPage + 1;
-        const end = Math.min(this.state.currentPage * this.state.perPage, this.state.totalMessageCount);
-        this.elements.messageRange.textContent = `${start}-${end}`;
-        
-        // ボタンの有効/無効制御
-        this.elements.prevPage.disabled = this.state.currentPage === 1;
-        this.elements.nextPage.disabled = this.state.currentPage === this.state.totalPages;
-        
-        // ページネーションの表示/非表示
-        if (this.state.totalPages > 1) {
-            this.elements.pagination.classList.remove('hidden');
-        } else {
-            this.elements.pagination.classList.add('hidden');
+
+    async handleSearch() {
+        const query = this.elements.searchInput?.value?.trim();
+        if (!query) {
+            this.showNotification(
+                '検索キーワードを入力してください',
+                'warning'
+            );
+            return;
         }
-    }
-    
-    async goToPreviousPage() {
-        if (this.state.currentPage > 1) {
-            this.state.currentPage--;
-            await this.loadCurrentMessages();
-            this.scrollToTop();
-        }
-    }
-    
-    async goToNextPage() {
-        if (this.state.currentPage < this.state.totalPages) {
-            this.state.currentPage++;
-            await this.loadCurrentMessages();
-            this.scrollToTop();
-        }
-    }
-    
-    scrollToTop() {
-        const scrollContent = document.getElementById('scrollContent');
-        if (scrollContent) {
-            scrollContent.scrollTop = 0;
-        }
-        
-        // チャット領域全体も一番上にスクロール
-        const chatArea = document.querySelector('.chat-area');
-        if (chatArea) {
-            chatArea.scrollTop = 0;
-        }
-    }
-    
-    async loadCurrentMessages() {
-        if (this.state.multiFileMode) {
-            await this.loadMultipleFiles();
-        } else if (this.state.currentFile) {
-            await this.loadSingleFile(this.state.currentFile);
-        }
-    }
-    
-    async loadSingleFile(filePath) {
+
         try {
-            this.showLoading('メッセージを読み込み中...');
-            
-            const startTime = Date.now();
-            const data = await apiClient.getMessages(filePath, this.state.currentPage, this.state.perPage);
-            const loadTime = Date.now() - startTime;
-            
-            if (!data || !data.success) {
-                throw new Error(data?.error || 'データの取得に失敗しました');
+            this.showSearchLoading('検索中...');
+
+            const response = await fetch(
+                `/api/search?q=${encodeURIComponent(query)}&limit=1000`
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                this.displaySearchResults(data.results, query);
+                this.updateStats({
+                    messageCount: data.total,
+                    dateRange: `検索: "${query}"`,
+                });
+                this.showNotification(
+                    `"${query}"の検索結果: ${data.total}件`,
+                    'success'
+                );
+            } else {
+                throw new Error(data.error || 'メッセージ検索に失敗しました');
             }
-            
-            // ページネーション情報を更新
-            this.state.totalMessageCount = data.total;
-            this.state.totalPages = Math.ceil(data.total / this.state.perPage);
-            
-            // メッセージ表示
-            this.showMessages(data.messages);
-            this.updatePagination();
-            this.updateStats(data.total, loadTime);
-            
         } catch (error) {
-            console.error('ファイル読み込みエラー:', error);
-            this.showNotification('メッセージの読み込みに失敗しました: ' + error.message, 'error');
+            console.error('Search error:', error);
+            this.showNotification(error.message, 'error');
         } finally {
-            this.hideLoading();
+            this.hideSearchLoading();
         }
+    }
+
+    displaySearchResults(messages, query) {
+        if (!this.elements.messageArea || !messages || messages.length === 0) {
+            if (this.elements.messageArea) {
+                this.elements.messageArea.innerHTML = `<div class="empty-state">"${query}"に一致するメッセージが見つかりません</div>`;
+            }
+            return;
+        }
+
+        this.displayMessages(messages);
+    }
+
+    // 日付範囲制限を設定
+    async setDateRangeRestrictions() {
+        try {
+            const response = await fetch('/api/date-range');
+            const data = await response.json();
+
+            if (data.success && data.min_date && data.max_date) {
+                if (this.elements.startDate) {
+                    this.elements.startDate.min = data.min_date;
+                    this.elements.startDate.max = data.max_date;
+                }
+                if (this.elements.endDate) {
+                    this.elements.endDate.min = data.min_date;
+                    this.elements.endDate.max = data.max_date;
+                }
+                console.log(
+                    `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
+                );
+            }
+        } catch (error) {
+            console.warn('日付範囲制限の設定に失敗:', error);
+        }
+    }
+
+    clearSearchConditions() {
+        // 検索条件をクリア
+        if (this.elements.searchInput) this.elements.searchInput.value = '';
+        if (this.elements.startDate) this.elements.startDate.value = '';
+        if (this.elements.endDate) this.elements.endDate.value = '';
+
+        // 全メッセージを表示
+        this.loadAllMessages();
+        this.showNotification('検索条件をクリアしました', 'info');
     }
 }
 
-// グローバル関数 - メッセージコピー
-window.copyMessageToClipboard = function(button) {
-    const messageText = button.getAttribute('data-message');
-    // HTMLエンティティをデコード
-    const decodedMessage = messageText
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&');
-    
-    console.log('メッセージコピー:', decodedMessage);
-    
-    navigator.clipboard.writeText(decodedMessage).then(() => {
-        const originalText = button.innerHTML;
-        button.innerHTML = '✅ コピー済み';
-        button.style.color = '#22c55e';
-        setTimeout(() => {
-            button.innerHTML = originalText;
-            button.style.color = '';
-        }, 2000);
-    }).catch(err => {
-        console.error('メッセージコピーに失敗:', err);
-        // Fallbackとして古い方法を試す
-        try {
-            const textArea = document.createElement('textarea');
-            textArea.value = decodedMessage;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            
-            const originalText = button.innerHTML;
-            button.innerHTML = '✅ コピー済み';
-            button.style.color = '#22c55e';
-            setTimeout(() => {
-                button.innerHTML = originalText;
-                button.style.color = '';
-            }, 2000);
-        } catch (fallbackErr) {
-            console.error('Fallbackメッセージコピーも失敗:', fallbackErr);
-            if (window.uiManager) {
-                window.uiManager.showNotification('メッセージのコピーに失敗しました', 'error');
-            }
-        }
-    });
-};
-
-// グローバルUIマネージャー
+// グローバルに公開
+window.UIManager = UIManager;
 window.uiManager = new UIManager();

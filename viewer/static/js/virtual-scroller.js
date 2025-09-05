@@ -7,65 +7,76 @@ class VirtualScroller {
     constructor(container, options = {}) {
         this.container = container;
         this.scrollContent = container.querySelector('#scrollContent');
-        
+
         // 設定
         this.itemHeight = options.itemHeight || 150;
         this.renderBuffer = options.renderBuffer || 5;
         this.scrollThrottle = options.scrollThrottle || 16;
-        
+
         // 状態
         this.items = [];
         this.visibleStart = 0;
         this.visibleEnd = 0;
         this.renderedItems = new Map();
-        
+
         // スクロールイベント
-        this.throttledScroll = this.throttle(this.handleScroll.bind(this), this.scrollThrottle);
+        this.throttledScroll = this.throttle(
+            this.handleScroll.bind(this),
+            this.scrollThrottle
+        );
         this.container.addEventListener('scroll', this.throttledScroll);
-        
+
         // リサイズイベント
-        this.handleResize = this.throttle(this.updateVisibleRange.bind(this), 100);
+        this.handleResize = this.throttle(
+            this.updateVisibleRange.bind(this),
+            100
+        );
         window.addEventListener('resize', this.handleResize);
-        
+
         this.init();
     }
-    
+
     init() {
         this.container.style.position = 'relative';
         this.container.style.overflowY = 'auto';
         this.scrollContent.style.position = 'relative';
     }
-    
+
     setItems(items) {
         this.items = items;
         this.updateScrollHeight();
         this.updateVisibleRange();
         this.render();
     }
-    
+
     updateScrollHeight() {
         const totalHeight = this.items.length * this.itemHeight;
         this.scrollContent.style.height = `${totalHeight}px`;
     }
-    
+
     handleScroll() {
         this.updateVisibleRange();
         this.render();
     }
-    
+
     updateVisibleRange() {
         const scrollTop = this.container.scrollTop;
         const containerHeight = this.container.clientHeight;
-        
+
         // 可視範囲計算
         this.visibleStart = Math.floor(scrollTop / this.itemHeight);
-        this.visibleEnd = Math.ceil((scrollTop + containerHeight) / this.itemHeight);
-        
+        this.visibleEnd = Math.ceil(
+            (scrollTop + containerHeight) / this.itemHeight
+        );
+
         // バッファ追加
         this.visibleStart = Math.max(0, this.visibleStart - this.renderBuffer);
-        this.visibleEnd = Math.min(this.items.length, this.visibleEnd + this.renderBuffer);
+        this.visibleEnd = Math.min(
+            this.items.length,
+            this.visibleEnd + this.renderBuffer
+        );
     }
-    
+
     render() {
         // 表示範囲外のアイテムを削除
         for (const [index, element] of this.renderedItems.entries()) {
@@ -74,7 +85,7 @@ class VirtualScroller {
                 this.renderedItems.delete(index);
             }
         }
-        
+
         // 新しいアイテムを描画
         for (let i = this.visibleStart; i < this.visibleEnd; i++) {
             if (!this.renderedItems.has(i) && this.items[i]) {
@@ -84,7 +95,7 @@ class VirtualScroller {
             }
         }
     }
-    
+
     createMessageElement(message, index) {
         const element = document.createElement('div');
         element.className = `message message-${message.role}`;
@@ -93,36 +104,38 @@ class VirtualScroller {
         element.style.width = '100%';
         element.style.minHeight = `${this.itemHeight}px`;
         element.dataset.index = index;
-        
+
         // メッセージコンテンツ
         element.innerHTML = this.renderMessageContent(message);
-        
+
         return element;
     }
-    
+
     renderMessageContent(message) {
         const timestamp = this.formatTimestamp(message.timestamp);
         const roleIcon = this.getRoleIcon(message.role);
         const roleName = this.getRoleName(message.role);
-        
+
         let content = this.escapeHtml(message.content);
-        
+
         // コードブロック処理
         content = this.processCodeBlocks(content);
-        
+
         // ツール使用の処理
         if (message.content_type === 'tool_use' && message.tool_name) {
             content = this.processToolUse(content, message.tool_name);
         }
-        
+
         // リンクの処理
         content = this.processLinks(content);
-        
+
         // メッセージの行数をチェックして折り畳みが必要か判定
         const needsCollapse = this.shouldCollapseMessage(content);
         const collapseClass = needsCollapse ? 'collapsed' : '';
-        const expandButton = needsCollapse ? '<button class="message-expand-btn" onclick="toggleMessageExpand(this)">続きを読む</button>' : '';
-        
+        const expandButton = needsCollapse
+            ? '<button class="message-expand-btn" onclick="toggleMessageExpand(this)">続きを読む</button>'
+            : '';
+
         return `
             <div class="message-header">
                 <div class="message-role">
@@ -137,15 +150,19 @@ class VirtualScroller {
             </div>
         `;
     }
-    
+
     processCodeBlocks(content) {
         // コードブロック（```で囲まれた部分）を処理
-        return content.replace(/```(\w+)?\n([\s\S]*?)\n```/g, (match, language, code) => {
-            const lang = language || 'text';
-            const escapedCode = this.escapeHtml(code);
-            // data-code属性には生のコードを、HTMLでエスケープして格納
-            const dataCodeEscaped = code.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-            return `
+        return content.replace(
+            /```(\w+)?\n([\s\S]*?)\n```/g,
+            (match, language, code) => {
+                const lang = language || 'text';
+                const escapedCode = this.escapeHtml(code);
+                // data-code属性には生のコードを、HTMLでエスケープして格納
+                const dataCodeEscaped = code
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                return `
                 <div class="code-block">
                     <div class="code-header">
                         <span class="code-language">${lang}</span>
@@ -156,55 +173,66 @@ class VirtualScroller {
                     <pre class="code-content"><code class="language-${lang}">${escapedCode}</code></pre>
                 </div>
             `;
-        });
+            }
+        );
     }
-    
+
     processToolUse(content, toolName) {
         // ツール使用ブロックを展開可能にする
-        const match = content.match(/\[ツール使用:\s*([^\]]+)\]\n```json\n([\s\S]*?)\n```/);
+        const match = content.match(
+            /\[ツール使用:\s*([^\]]+)\]\n```json\n([\s\S]*?)\n```/
+        );
         if (match) {
             const [, tool, jsonData] = match;
-            return content.replace(match[0], `
+            return content.replace(
+                match[0],
+                `
                 <div class="tool-use">
                     <div class="tool-header" onclick="toggleToolDetails(this)">
                         🔧 ツール使用: ${tool}
                         <span class="toggle-icon">▼</span>
                     </div>
                     <div class="tool-details">
-                        <pre class="json-content">${this.escapeHtml(jsonData)}</pre>
+                        <pre class="json-content">${this.escapeHtml(
+                            jsonData
+                        )}</pre>
                     </div>
                 </div>
-            `);
+            `
+            );
         }
         return content;
     }
-    
+
     processLinks(content) {
         // URLを自動リンク化
         const urlRegex = /(https?:\/\/[^\s<>"]+)/g;
-        return content.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+        return content.replace(
+            urlRegex,
+            '<a href="$1" target="_blank" rel="noopener">$1</a>'
+        );
     }
-    
+
     getRoleIcon(role) {
         const icons = {
-            'user': '👤',
-            'assistant': '🤖',
-            'system': '⚙️',
-            'summary': '📋'
+            user: '👤',
+            assistant: '🤖',
+            system: '⚙️',
+            summary: '📋',
         };
         return icons[role] || '💬';
     }
-    
+
     getRoleName(role) {
         const names = {
-            'user': 'ユーザー',
-            'assistant': 'アシスタント', 
-            'system': 'システム',
-            'summary': 'サマリー'
+            user: 'ユーザー',
+            assistant: 'アシスタント',
+            system: 'システム',
+            summary: 'サマリー',
         };
         return names[role] || role;
     }
-    
+
     formatTimestamp(timestamp) {
         try {
             // "2024-03-31 14:28:15 JST" 形式を想定
@@ -213,46 +241,46 @@ class VirtualScroller {
             return timestamp;
         }
     }
-    
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-    
+
     shouldCollapseMessage(content) {
         // HTMLタグを除去してプレーンテキストの行数をカウント
         const textContent = content.replace(/<[^>]*>/g, '');
         const lines = textContent.split('\n').length;
-        
+
         // 文字数でも判定（長い行がある場合）
         const averageCharsPerLine = 60;
         const estimatedLines = textContent.length / averageCharsPerLine;
-        
+
         return Math.max(lines, estimatedLines) > 3;
     }
-    
+
     throttle(func, limit) {
         let inThrottle;
-        return function() {
+        return function () {
             const args = arguments;
             const context = this;
             if (!inThrottle) {
                 func.apply(context, args);
                 inThrottle = true;
-                setTimeout(() => inThrottle = false, limit);
+                setTimeout(() => (inThrottle = false), limit);
             }
         };
     }
-    
+
     scrollToMessage(index) {
         const targetScrollTop = index * this.itemHeight;
         this.container.scrollTo({
             top: targetScrollTop,
-            behavior: 'smooth'
+            behavior: 'smooth',
         });
     }
-    
+
     destroy() {
         this.container.removeEventListener('scroll', this.throttledScroll);
         window.removeEventListener('resize', this.handleResize);
@@ -261,7 +289,7 @@ class VirtualScroller {
 }
 
 // グローバル関数
-window.copyToClipboard = function(button) {
+window.copyToClipboard = function (button) {
     const code = button.getAttribute('data-code');
     // HTMLエンティティをデコード
     const decodedCode = code
@@ -270,41 +298,47 @@ window.copyToClipboard = function(button) {
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&amp;/g, '&');
-    
+
     console.log('コピー対象コード:', decodedCode);
-    
-    navigator.clipboard.writeText(decodedCode).then(() => {
-        button.textContent = '✅ コピー済み';
-        setTimeout(() => {
-            button.innerHTML = '📋 コピー';
-        }, 2000);
-    }).catch(err => {
-        console.error('コピーに失敗:', err);
-        // Fallbackとして古い方法を試す
-        try {
-            const textArea = document.createElement('textarea');
-            textArea.value = decodedCode;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
+
+    navigator.clipboard
+        .writeText(decodedCode)
+        .then(() => {
             button.textContent = '✅ コピー済み';
             setTimeout(() => {
                 button.innerHTML = '📋 コピー';
             }, 2000);
-        } catch (fallbackErr) {
-            console.error('Fallbackコピーも失敗:', fallbackErr);
-            if (window.uiManager) {
-                window.uiManager.showNotification('コピーに失敗しました', 'error');
+        })
+        .catch((err) => {
+            console.error('コピーに失敗:', err);
+            // Fallbackとして古い方法を試す
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = decodedCode;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                button.textContent = '✅ コピー済み';
+                setTimeout(() => {
+                    button.innerHTML = '📋 コピー';
+                }, 2000);
+            } catch (fallbackErr) {
+                console.error('Fallbackコピーも失敗:', fallbackErr);
+                if (window.uiManager) {
+                    window.uiManager.showNotification(
+                        'コピーに失敗しました',
+                        'error'
+                    );
+                }
             }
-        }
-    });
+        });
 };
 
-window.toggleToolDetails = function(header) {
+window.toggleToolDetails = function (header) {
     const details = header.nextElementSibling;
     const icon = header.querySelector('.toggle-icon');
-    
+
     if (details.style.display === 'none' || !details.style.display) {
         details.style.display = 'block';
         icon.textContent = '▲';
@@ -313,4 +347,3 @@ window.toggleToolDetails = function(header) {
         icon.textContent = '▼';
     }
 };
-

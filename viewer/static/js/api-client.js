@@ -100,6 +100,16 @@ class ApiClient {
         
         return await this.request(`/search?${params}`);
     }
+
+    async searchByDateRange(startDate, endDate, limit = 1000) {
+        const params = new URLSearchParams({ 
+            start_date: startDate, 
+            end_date: endDate, 
+            limit: limit.toString()
+        });
+        
+        return await this.request(`/search/date-range?${params}`);
+    }
     
     async buildCache() {
         return await this.request('/cache/build', {

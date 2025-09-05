@@ -1,62 +1,63 @@
 #!/usr/bin/env python3
 """
-高速チャットビューアー Flask アプリケーション
-SQLiteキャッシュによる高速化を実装
+会話ログビューアー Flask アプリケーション
+SQLiteデータベースからの会話データ表示
 """
 import os
 import sys
 import json
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
-from message_cache import MessageCache, load_chat_messages, build_initial_cache
 
-# 親ディレクトリのlog_converter.pyからConfigクラスをインポート
+# 親ディレクトリのlog_converter.pyからクラスをインポート
 sys.path.append(str(Path(__file__).parent.parent))
 try:
-    from log_converter import Config
+    from log_converter import Config, LogDatabase
 except ImportError as e:
-    print(f"警告: 設定ファイルの読み込みに失敗しました: {e}")
+    print(f"警告: log_converter.pyの読み込みに失敗しました: {e}")
     Config = None
+    LogDatabase = None
 
 app = Flask(__name__)
 
 # 設定
 app.config['SECRET_KEY'] = 'claude-log-viewer-secret-key'
 
-def get_logs_directory():
-    """設定ファイルからログディレクトリを取得"""
+def get_database_path():
+    """データベースファイルのパスを取得"""
     try:
         if Config is None:
             print("警告: Configクラスが利用できません。デフォルトパスを使用します。")
-            return Path('../')
-        
+            return Path('../log_data.db')
+
         # 設定ファイルのパスを解決（viewerディレクトリから見た相対パス）
         config_file = Path(__file__).parent.parent / 'log_converter_config.ini'
-        
-        if not config_file.exists():
+
+        if config_file.exists():
+            config = Config(str(config_file))
+            output_dir = config.get_output_directory()
+
+            # 相対パスの場合は設定ファイルの場所を基準に解決
+            if not output_dir.is_absolute():
+                output_dir = config_file.parent / output_dir
+
+            db_path = output_dir / 'log_data.db'
+            print(f"データベースパス: {db_path}")
+            return db_path.resolve()
+        else:
             print(f"警告: 設定ファイルが見つかりません: {config_file}")
-            return Path('../')
-        
-        config = Config(str(config_file))
-        output_dir = config.get_output_directory()
-        
-        # 相対パスの場合は設定ファイルの場所を基準に解決
-        if not output_dir.is_absolute():
-            output_dir = config_file.parent / output_dir
-        
-        print(f"設定ファイルから読み込んだログディレクトリ: {output_dir}")
-        return output_dir.resolve()
-        
+            return Path('../log_data.db')
+
     except Exception as e:
         print(f"エラー: 設定ファイルの読み込みに失敗しました: {e}")
-        print("デフォルトパス '../' を使用します。")
-        return Path('../')
+        print("デフォルトデータベースパス '../log_data.db' を使用します。")
+        return Path('../log_data.db')
 
-# ログディレクトリを動的に取得
-LOGS_DIR = get_logs_directory()
+# データベースパスを動的に取得
+DB_PATH = get_database_path()
 
-# グローバルキャッシュインスタンス
-cache = MessageCache()
+# グローバルデータベースインスタンス
+database = LogDatabase(str(DB_PATH)) if LogDatabase else None
 
 
 @app.route('/')
@@ -67,72 +68,50 @@ def index():
 
 @app.route('/api/files')
 def get_files():
-    """利用可能ファイル一覧を取得"""
+    """利用可能ファイル一覧を取得（データベースから）"""
     try:
-        # Markdownファイルを検索
-        md_files = []
-        for pattern in ['log_*.md']:
-            md_files.extend(LOGS_DIR.glob(pattern))
-        
+        if database is None:
+            return jsonify({
+                'success': False,
+                'error': 'データベースが利用できません'
+            }), 500
+
+        # データベースから登録済みファイル一覧を取得
+        with database.db_path.open() as _:  # データベースファイルの存在確認
+            pass
+
+        import sqlite3
         files_info = []
-        for file_path in md_files:
-            stat = file_path.stat()
-            
-            # キャッシュ状況確認
-            file_id = cache.is_cached_and_valid(file_path)
-            is_cached = file_id is not None
-            
-            # 最後のメッセージの日時を取得
-            last_message_time = None
-            try:
-                messages = load_chat_messages(file_path)
-                if messages:
-                    # 最後のメッセージのタイムスタンプを取得
-                    last_message = messages[-1]
-                    if 'timestamp' in last_message:
-                        from datetime import datetime
-                        if isinstance(last_message['timestamp'], str):
-                            # ISO形式またはJST形式の文字列をパース
-                            timestamp_str = last_message['timestamp'].replace(' JST', '')
-                            try:
-                                # ISO形式を試す
-                                dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                                last_message_time = int(dt.timestamp())
-                            except:
-                                # JST形式を試す（例: 2024-03-31 14:28:15）
-                                try:
-                                    dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
-                                    last_message_time = int(dt.timestamp())
-                                except:
-                                    # パースに失敗した場合はファイルの更新時刻を使用
-                                    last_message_time = int(stat.st_mtime)
-                        else:
-                            last_message_time = int(last_message['timestamp'])
-                    else:
-                        last_message_time = int(stat.st_mtime)
-                else:
-                    last_message_time = int(stat.st_mtime)
-            except Exception as e:
-                print(f"ファイル {file_path.name} の最終メッセージ日時取得エラー: {e}")
-                last_message_time = int(stat.st_mtime)
-            
-            files_info.append({
-                'path': str(file_path.relative_to(LOGS_DIR)),
-                'name': file_path.name,
-                'size': stat.st_size,
-                'modified': last_message_time,  # 最終メッセージ時刻を使用
-                'is_cached': is_cached
-            })
-        
-        # 最終メッセージ時刻順でソート
-        files_info.sort(key=lambda x: x['modified'], reverse=True)
-        
+        with sqlite3.connect(database.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # conversationsテーブルから直接ファイル一覧と件数を取得
+            cursor = conn.execute('''
+                SELECT filename,
+                       COUNT(*) as message_count,
+                       MIN(timestamp) as first_message,
+                       MAX(timestamp) as last_message
+                FROM conversations
+                GROUP BY filename
+                ORDER BY MAX(timestamp) DESC
+            ''')
+
+            for row in cursor.fetchall():
+                files_info.append({
+                    'path': row['filename'],
+                    'name': row['filename'],
+                    'size': 0,  # ファイルサイズは不要
+                    'modified': row['last_message'],  # 最新メッセージ日時を使用
+                    'is_cached': True,  # データベースに登録済み
+                    'message_count': row['message_count']
+                })
+
         return jsonify({
             'success': True,
             'files': files_info,
             'total': len(files_info)
         })
-    
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -142,35 +121,57 @@ def get_files():
 
 @app.route('/api/messages/<path:filename>')
 def get_messages(filename):
-    """メッセージデータを取得（高速キャッシュ対応）"""
+    """メッセージデータを取得（データベースから）"""
     try:
-        file_path = LOGS_DIR / filename
-        
-        if not file_path.exists():
+        if database is None:
             return jsonify({
                 'success': False,
-                'error': 'ファイルが見つかりません'
-            }), 404
-        
-        # 高速読み込み（キャッシュ優先）
-        messages = load_chat_messages(file_path)
-        
+                'error': 'データベースが利用できません'
+            }), 500
+
         # ページネーション対応
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 50, type=int)
-        
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        
+
+        import sqlite3
+        with sqlite3.connect(database.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # 総数を取得
+            cursor = conn.execute('''
+                SELECT COUNT(*) as total
+                FROM conversations
+                WHERE filename = ?
+            ''', (filename,))
+            total = cursor.fetchone()['total']
+
+            # ページネーション適用してメッセージを取得
+            offset = (page - 1) * per_page
+            cursor = conn.execute('''
+                SELECT role, timestamp, content, filename
+                FROM conversations
+                WHERE filename = ?
+                ORDER BY datetime(timestamp)
+                LIMIT ? OFFSET ?
+            ''', (filename, per_page, offset))
+
+            messages = []
+            for row in cursor.fetchall():
+                messages.append({
+                    'role': row['role'],
+                    'timestamp': row['timestamp'],
+                    'content': row['content']
+                })
+
         return jsonify({
             'success': True,
-            'messages': messages[start_idx:end_idx],
-            'total': len(messages),
+            'messages': messages,
+            'total': total,
             'page': page,
             'per_page': per_page,
-            'has_more': end_idx < len(messages)
+            'has_more': (page * per_page) < total
         })
-    
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -180,36 +181,135 @@ def get_messages(filename):
 
 @app.route('/api/search')
 def search_messages():
-    """高速全文検索（FTS5使用）"""
+    """高速全文検索（データベースから）"""
     try:
+        if database is None:
+            return jsonify({
+                'success': False,
+                'error': 'データベースが利用できません'
+            }), 500
+
         query = request.args.get('q', '').strip()
         file_filter = request.args.get('file')
         limit = request.args.get('limit', 100, type=int)
-        
+
         if not query:
             return jsonify({
                 'success': False,
                 'error': 'クエリが空です'
             })
-        
-        # ファイルフィルター処理
-        file_ids = None
-        if file_filter:
-            file_path = LOGS_DIR / file_filter
-            file_id = cache.is_cached_and_valid(file_path)
-            if file_id:
-                file_ids = [file_id]
-        
-        # FTS5による高速検索
-        results = cache.search_messages(query, file_ids, limit)
-        
+
+        # データベースから検索実行
+        import sqlite3
+        results = []
+        with sqlite3.connect(database.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # ファイルフィルター適用
+            if file_filter:
+                cursor = conn.execute('''
+                    SELECT role, timestamp, content, filename
+                    FROM conversations
+                    WHERE content LIKE ? AND filename = ?
+                    ORDER BY datetime(timestamp) DESC
+                    LIMIT ?
+                ''', (f'%{query}%', file_filter, limit))
+            else:
+                cursor = conn.execute('''
+                    SELECT role, timestamp, content, filename
+                    FROM conversations
+                    WHERE content LIKE ?
+                    ORDER BY datetime(timestamp) DESC
+                    LIMIT ?
+                ''', (f'%{query}%', limit))
+
+            for row in cursor.fetchall():
+                results.append({
+                    'role': row['role'],
+                    'timestamp': row['timestamp'],
+                    'content': row['content'],
+                    'filename': row['filename']
+                })
+
         return jsonify({
             'success': True,
             'results': results,
             'query': query,
             'total': len(results)
         })
-    
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/search/date-range')
+def search_messages_by_date_range():
+    """日付範囲による検索（データベースから）"""
+    try:
+        if database is None:
+            return jsonify({
+                'success': False,
+                'error': 'データベースが利用できません'
+            }), 500
+
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        limit = request.args.get('limit', 1000, type=int)
+
+
+        if not start_date or not end_date:
+            return jsonify({
+                'success': False,
+                'error': '開始日と終了日の両方を指定してください'
+            })
+
+        # 日付フォーマット検証（YYYY-MM-DD形式）
+        from datetime import datetime
+        try:
+            datetime.strptime(start_date, '%Y-%m-%d')
+            datetime.strptime(end_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': '日付形式はYYYY-MM-DD形式で入力してください'
+            })
+
+        print(f"検索日付範囲: {start_date} 〜 {end_date}")
+        # データベースから日付範囲検索実行
+        import sqlite3
+        results = []
+        with sqlite3.connect(database.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # 日付範囲でフィルタリング（タイムスタンプの日付部分を比較）
+            cursor = conn.execute('''
+                SELECT role, timestamp, content, filename
+                FROM conversations
+                WHERE date(timestamp) >= ? AND date(timestamp) <= ?
+                ORDER BY datetime(timestamp) DESC
+                LIMIT ?
+            ''', (start_date, end_date, limit))
+
+            for row in cursor.fetchall():
+                results.append({
+                    'role': row['role'],
+                    'timestamp': row['timestamp'],
+                    'content': row['content'],
+                    'filename': row['filename'],
+                    'file_name': row['filename']
+                })
+
+        return jsonify({
+            'success': True,
+            'results': results,
+            'start_date': start_date,
+            'end_date': end_date,
+            'total': len(results)
+        })
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -219,24 +319,37 @@ def search_messages():
 
 @app.route('/api/cache/build', methods=['POST'])
 def build_cache():
-    """全ファイルのキャッシュを作成"""
+    """ログファイルの再処理（log_converter.pyを呼び出し）"""
     try:
-        # バックグラウンドでキャッシュ作成
-        md_files = list(LOGS_DIR.glob("log_*.md"))
-        
-        processed = 0
-        for file_path in md_files:
-            if not cache.is_cached_and_valid(file_path):
-                messages = load_chat_messages(file_path)
-                processed += 1
-        
-        return jsonify({
-            'success': True,
-            'message': f'{processed}件のファイルをキャッシュしました',
-            'total_files': len(md_files),
-            'processed': processed
-        })
-    
+        # log_converter.pyを実行して最新データを取得
+        import subprocess
+        import sys
+
+        log_converter_path = Path(__file__).parent.parent / 'log_converter.py'
+
+        if not log_converter_path.exists():
+            return jsonify({
+                'success': False,
+                'error': 'log_converter.pyが見つかりません'
+            }), 500
+
+        # log_converter.pyを実行（強制更新）
+        result = subprocess.run([
+            sys.executable, str(log_converter_path), '--force'
+        ], capture_output=True, text=True, cwd=log_converter_path.parent)
+
+        if result.returncode == 0:
+            return jsonify({
+                'success': True,
+                'message': 'ログファイルの再処理が完了しました',
+                'output': result.stdout
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'ログファイル処理でエラーが発生しました: {result.stderr}'
+            }), 500
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -246,23 +359,68 @@ def build_cache():
 
 @app.route('/api/cache/clear', methods=['POST'])
 def clear_cache():
-    """キャッシュクリア"""
+    """データベースクリア"""
     try:
-        filename = request.json.get('file') if request.is_json else None
-        
-        if filename:
-            file_path = LOGS_DIR / filename
-            cache.clear_cache(file_path)
-            message = f'{filename}のキャッシュを削除しました'
-        else:
-            cache.clear_cache()
-            message = 'すべてのキャッシュを削除しました'
-        
+        if database is None:
+            return jsonify({
+                'success': False,
+                'error': 'データベースが利用できません'
+            }), 500
+
+        # データベースをクリア
+        import sqlite3
+        with sqlite3.connect(database.db_path) as conn:
+            conn.execute('DELETE FROM conversations')
+            conn.execute('DELETE FROM log_files')
+
         return jsonify({
             'success': True,
-            'message': message
+            'message': 'すべてのデータベースデータを削除しました'
         })
-    
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/date-range')
+def get_date_range():
+    """利用可能な日付範囲を取得"""
+    try:
+        if database is None:
+            return jsonify({
+                'success': False,
+                'error': 'データベースが利用できません'
+            }), 500
+
+        import sqlite3
+        with sqlite3.connect(database.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # 最初と最後の会話日時を取得
+            cursor = conn.execute('''
+                SELECT
+                    MIN(date(timestamp)) as min_date,
+                    MAX(date(timestamp)) as max_date
+                FROM conversations
+            ''')
+            result = cursor.fetchone()
+
+            if result and result['min_date'] and result['max_date']:
+                return jsonify({
+                    'success': True,
+                    'min_date': result['min_date'],
+                    'max_date': result['max_date']
+                })
+            else:
+                return jsonify({
+                    'success': True,
+                    'min_date': None,
+                    'max_date': None
+                })
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -272,22 +430,52 @@ def clear_cache():
 
 @app.route('/api/stats')
 def get_stats():
-    """統計情報を取得"""
+    """統計情報を取得（データベースから）"""
     try:
-        cached_files = cache.get_cached_files()
-        
+        if database is None:
+            return jsonify({
+                'success': False,
+                'error': 'データベースが利用できません'
+            }), 500
+
+        import sqlite3
+        with sqlite3.connect(database.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # ファイル数を取得
+            cursor = conn.execute('SELECT COUNT(*) as file_count FROM log_files')
+            file_count = cursor.fetchone()['file_count']
+
+            # メッセージ数を取得
+            cursor = conn.execute('SELECT COUNT(*) as message_count FROM conversations')
+            message_count = cursor.fetchone()['message_count']
+
+            # 最新ファイル情報を取得（シンプル版）
+            cursor = conn.execute('''
+                SELECT filename, last_modified
+                FROM log_files
+                ORDER BY last_modified DESC
+                LIMIT 10
+            ''')
+            recent_files = []
+            for row in cursor.fetchall():
+                recent_files.append({
+                    'filename': row['filename'],
+                    'last_modified': row['last_modified']
+                })
+
         stats = {
-            'cached_files': len(cached_files),
-            'total_messages': sum(f['message_count'] for f in cached_files),
-            'cache_size_mb': cache.db_path.stat().st_size / (1024 * 1024) if cache.db_path.exists() else 0,
-            'files': cached_files[:10]  # 最新10件
+            'cached_files': file_count,
+            'total_messages': message_count,
+            'cache_size_mb': database.db_path.stat().st_size / (1024 * 1024) if database.db_path.exists() else 0,
+            'files': recent_files
         }
-        
+
         return jsonify({
             'success': True,
             'stats': stats
         })
-    
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -320,25 +508,30 @@ def internal_error(error):
 
 def init_app():
     """アプリケーション初期化"""
-    # キャッシュディレクトリ作成
-    cache_dir = Path('cache')
-    cache_dir.mkdir(exist_ok=True)
-    
-    # ログディレクトリ確認
-    if not LOGS_DIR.exists():
-        print(f"警告: ログディレクトリが見つかりません: {LOGS_DIR}")
-    
-    print(f"ログディレクトリ: {LOGS_DIR.absolute()}")
-    print(f"キャッシュディレクトリ: {cache_dir.absolute()}")
+    # データベース初期化確認
+    if database is None:
+        print("警告: データベースの初期化に失敗しました")
+    else:
+        print(f"データベースパス: {database.db_path.absolute()}")
+
+        # データベース存在確認
+        if database.db_path.exists():
+            import sqlite3
+            with sqlite3.connect(database.db_path) as conn:
+                cursor = conn.execute('SELECT COUNT(*) FROM conversations')
+                count = cursor.fetchone()[0]
+                print(f"登録済み会話データ: {count:,}件")
+        else:
+            print("データベースファイルが見つかりません。log_converter.pyを実行してください。")
 
 
 if __name__ == '__main__':
     init_app()
-    
+
     # 開発用サーバー起動
     print("Claude Log Viewer 開始中...")
     print("ブラウザで http://localhost:5000 にアクセスしてください")
-    
+
     app.run(
         host='0.0.0.0',
         port=5000,

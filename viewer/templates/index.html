@@ -16,11 +16,19 @@
                     <div class="search-container">
                         <input type="text" id="searchInput" placeholder="メッセージを検索..." class="search-input">
                         <button id="searchBtn" class="search-btn">🔍</button>
+                        <div id="searchLoading" class="search-loading">
+                            <div class="search-loading-spinner"></div>
+                            <span class="search-loading-text">検索中...</span>
+                        </div>
                     </div>
-                    <div class="file-selector">
-                        <select id="fileSelect" class="file-select">
-                            <option value="">ファイルを選択...</option>
-                        </select>
+                    <div class="date-search-container">
+                        <input type="date" id="startDate" class="date-input" title="開始日">
+                        <span class="date-separator">-</span>
+                        <input type="date" id="endDate" class="date-input" title="終了日">
+                        <button id="dateSearchBtn" class="date-search-btn">📅 日付検索</button>
+                        <button id="clearSearchBtn" class="clear-btn" title="検索条件をクリア">✕</button>
+                    </div>
+                    <div class="status-display">
                         <span id="fileStatus" class="file-status"></span>
                     </div>
                 </div>
@@ -29,21 +37,6 @@
 
         <!-- メインコンテンツ -->
         <main class="main">
-            <!-- サイドバー -->
-            <aside class="sidebar" id="sidebar">
-                <div class="sidebar-header">
-                    <h3>ファイル一覧</h3>
-                    <button id="toggleSidebar" class="toggle-btn">←</button>
-                </div>
-                <div class="file-list" id="fileList">
-                    <!-- ファイル一覧がここに動的に追加される -->
-                </div>
-                <div class="sidebar-footer">
-                    <button id="buildCacheBtn" class="cache-btn">キャッシュ作成</button>
-                    <button id="clearCacheBtn" class="cache-btn secondary">キャッシュ削除</button>
-                </div>
-            </aside>
-
             <!-- チャット領域 -->
             <section class="chat-area">
                 <!-- ローディング表示 -->
@@ -56,7 +49,7 @@
                 <div id="messageArea" class="message-area">
                     <div class="welcome-message">
                         <h2>Claude Log Viewer へようこそ</h2>
-                        <p>左側のファイル一覧から会話ログを選択してください。</p>
+                        <p>左側の日付範囲を選択して会話ログを表示してください。</p>
                         <div class="features">
                             <div class="feature">
                                 <h3>⚡ 高速読み込み</h3>
