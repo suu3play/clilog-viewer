@@ -276,11 +276,6 @@ body {
     margin-bottom: var(--spacing-1);
 }
 
-.file-checkbox {
-    margin: 0;
-    cursor: pointer;
-    transform: scale(1.2);
-}
 
 .file-icon {
     font-size: var(--font-size-lg);

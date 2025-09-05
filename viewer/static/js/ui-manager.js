@@ -12,8 +12,6 @@ class UIManager {
             theme: 'light',
             sidebarOpen: true,
             searchMode: false,
-            selectedFiles: new Set(),
-            multiFileMode: false,
             currentPage: 1,
             totalPages: 1,
             perPage: 50,
@@ -171,7 +169,6 @@ class UIManager {
             
             item.innerHTML = `
                 <div class="file-header">
-                    <input type="checkbox" class="file-checkbox" id="checkbox-${file.path}" data-path="${file.path}">
                     <span class="file-icon">${cacheIcon}</span>
                     <span class="file-name">${file.name}</span>
                 </div>
@@ -181,16 +178,8 @@ class UIManager {
                 </div>
             `;
             
-            // チェックボックスのイベントハンドラー
-            const checkbox = item.querySelector('.file-checkbox');
-            checkbox.addEventListener('change', (e) => {
-                e.stopPropagation();
-                this.handleFileCheckboxChange(file.path, checkbox.checked);
-            });
-            
-            // ファイル名クリックでの単一選択
-            const fileName = item.querySelector('.file-name');
-            fileName.addEventListener('click', () => this.handleFileSelect(file.path));
+            // ファイル全体クリックでファイル選択
+            item.addEventListener('click', () => this.handleFileSelect(file.path));
             
             list.appendChild(item);
         });
@@ -213,7 +202,6 @@ class UIManager {
         // ページネーション状態をリセット
         this.state.currentFile = filePath;
         this.state.currentPage = 1;
-        this.state.multiFileMode = false;
         
         // ファイル名を取得してステータス表示
         const fileName = filePath.split('/').pop() || filePath;
@@ -477,9 +465,7 @@ class UIManager {
         }
         
         // ソースファイル表示（複数ファイルモードの場合）
-        const sourceFileDisplay = this.state.multiFileMode && message.sourceFile 
-            ? `<span class="source-file">[${message.sourceFile}]</span>` 
-            : '';
+        const sourceFileDisplay = '';
         
         // コンテンツを処理
         let content = this.escapeHtml(message.content);
@@ -717,86 +703,6 @@ class UIManager {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
     
-    // チェックボックス状態管理
-    handleFileCheckboxChange(filePath, checked) {
-        if (checked) {
-            this.state.selectedFiles.add(filePath);
-        } else {
-            this.state.selectedFiles.delete(filePath);
-        }
-        
-        console.log('選択ファイル:', Array.from(this.state.selectedFiles));
-        
-        // 複数ファイルキャッシュをリセット
-        this.multiFileAllMessages = null;
-        this.state.currentPage = 1;
-        
-        // 選択ファイルが1つ以上の場合、複数ファイルモードに切り替え
-        if (this.state.selectedFiles.size > 0) {
-            this.loadMultipleFiles();
-        } else {
-            // 選択ファイルがない場合、ウェルカムメッセージを表示
-            this.showWelcomeMessage();
-        }
-    }
-    
-    async loadMultipleFiles() {
-        if (this.state.selectedFiles.size === 0) return;
-        
-        this.state.multiFileMode = true;
-        const fileList = Array.from(this.state.selectedFiles);
-        
-        try {
-            this.showLoading('複数ファイルを読み込み中...');
-            
-            // 初回のみ全データを取得してキャッシュ
-            if (!this.multiFileAllMessages) {
-                const allMessages = [];
-                for (const filePath of fileList) {
-                    // すべてのページを取得（perPageを大きな値に設定）
-                    const data = await apiClient.getMessages(filePath, 1, 10000);
-                    if (data.success && data.messages) {
-                        // ファイル情報をメッセージに追加
-                        const fileName = filePath.split('/').pop() || filePath;
-                        data.messages.forEach(msg => {
-                            msg.sourceFile = fileName;
-                            msg.sourceFilePath = filePath;
-                        });
-                        allMessages.push(...data.messages);
-                    }
-                }
-                
-                // 日時順でソート
-                allMessages.sort((a, b) => {
-                    const timeA = new Date(a.timestamp).getTime();
-                    const timeB = new Date(b.timestamp).getTime();
-                    return timeA - timeB;
-                });
-                
-                this.multiFileAllMessages = allMessages;
-            }
-            
-            // ページネーション情報を更新
-            this.state.totalMessageCount = this.multiFileAllMessages.length;
-            this.state.totalPages = Math.ceil(this.state.totalMessageCount / this.state.perPage);
-            
-            // 現在のページのメッセージを取得
-            const startIndex = (this.state.currentPage - 1) * this.state.perPage;
-            const endIndex = startIndex + this.state.perPage;
-            const currentPageMessages = this.multiFileAllMessages.slice(startIndex, endIndex);
-            
-            // 表示
-            this.showMessages(currentPageMessages);
-            this.updatePagination();
-            this.updateFileStatus(`${fileList.length}ファイル選択中 (${this.state.totalMessageCount}メッセージ)`);
-            
-        } catch (error) {
-            console.error('複数ファイル読み込みエラー:', error);
-            this.showNotification('複数ファイルの読み込みに失敗しました: ' + error.message, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
     
     // ページネーション関連メソッド
     updatePagination() {
@@ -850,9 +756,7 @@ class UIManager {
     }
     
     async loadCurrentMessages() {
-        if (this.state.multiFileMode) {
-            await this.loadMultipleFiles();
-        } else if (this.state.currentFile) {
+        if (this.state.currentFile) {
             await this.loadSingleFile(this.state.currentFile);
         }
     }

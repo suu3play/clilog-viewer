@@ -1,11 +1,9 @@
 # 実行時に生成されるファイル
 processed_files.json
 
-# 設定ファイル（個人設定）
-log_converter_config.ini
-
 # 生成されたMarkdownファイル
 log_*.md
+code_check_*.md
 
 # Python関連
 __pycache__/
