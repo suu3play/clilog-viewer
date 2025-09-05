@@ -175,6 +175,28 @@ class MessageCache:
 
             return [dict(row) for row in cursor.fetchall()]
 
+    def search_messages_by_date_range(self, start_date: str, end_date: str, limit: int = 1000) -> List[Dict]:
+        """日付範囲によるメッセージ検索"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            
+            cursor = conn.execute('''
+                SELECT m.*, f.file_path
+                FROM messages m
+                JOIN files f ON f.id = m.file_id
+                WHERE datetime(substr(m.timestamp, 1, 19)) BETWEEN datetime(?) AND datetime(?)
+                ORDER BY datetime(substr(m.timestamp, 1, 19))
+                LIMIT ?
+            ''', (start_date, end_date, limit))
+            
+            results = []
+            for row in cursor.fetchall():
+                row_dict = dict(row)
+                row_dict['file_name'] = Path(row_dict['file_path']).name
+                results.append(row_dict)
+                
+            return results
+
     def get_cached_files(self) -> List[Dict]:
         """キャッシュ済みファイル一覧を取得"""
         with sqlite3.connect(self.db_path) as conn:

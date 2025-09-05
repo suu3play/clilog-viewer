@@ -125,6 +125,7 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-4);
+    flex-wrap: wrap;
 }
 
 .search-container {
@@ -186,6 +187,50 @@ body {
     font-size: var(--font-size-xs);
     color: var(--text-muted);
     white-space: nowrap;
+}
+
+/* ===== 日付検索 ===== */
+.date-search-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.date-input {
+    padding: var(--spacing-2) var(--spacing-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.date-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.date-separator {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.date-search-btn {
+    padding: var(--spacing-2) var(--spacing-3);
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    white-space: nowrap;
+}
+
+.date-search-btn:hover {
+    background-color: #d97706;
 }
 
 /* ===== メイン ===== */
@@ -781,6 +826,46 @@ body {
     background-color: rgba(245, 158, 11, 0.3);
     padding: 0 var(--spacing-1);
     border-radius: var(--radius-sm);
+}
+
+/* ===== 日付検索結果 ===== */
+.search-results-header {
+    padding: var(--spacing-4);
+    margin-bottom: var(--spacing-4);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    text-align: center;
+}
+
+.search-results-header h3 {
+    font-size: var(--font-size-lg);
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-2);
+}
+
+.search-results-header p {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin: 0;
+}
+
+.no-results {
+    padding: var(--spacing-8);
+    text-align: center;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+}
+
+.no-results h3 {
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-4);
+}
+
+.no-results p {
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-2);
 }
 
 /* ===== フッター ===== */

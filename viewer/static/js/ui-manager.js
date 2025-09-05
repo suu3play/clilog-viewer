@@ -36,6 +36,9 @@ class UIManager {
             // ヘッダー
             searchInput: document.getElementById('searchInput'),
             searchBtn: document.getElementById('searchBtn'),
+            startDate: document.getElementById('startDate'),
+            endDate: document.getElementById('endDate'),
+            dateSearchBtn: document.getElementById('dateSearchBtn'),
             fileSelect: document.getElementById('fileSelect'),
             fileStatus: document.getElementById('fileStatus'),
             
@@ -89,6 +92,9 @@ class UIManager {
             if (e.key === 'Enter') this.handleSearch();
         });
         this.elements.closeSearch.addEventListener('click', () => this.hideSearchResults());
+        
+        // 日付検索
+        this.elements.dateSearchBtn.addEventListener('click', () => this.handleDateSearch());
         
         // ファイル選択
         this.elements.fileSelect.addEventListener('change', (e) => this.handleFileSelect(e.target.value));
@@ -326,6 +332,149 @@ class UIManager {
         snippet = this.escapeHtml(snippet).replace(regex, '<mark>$1</mark>');
         
         return snippet;
+    }
+
+    async handleDateSearch() {
+        const startDate = this.elements.startDate.value.trim();
+        const endDate = this.elements.endDate.value.trim();
+        
+        if (!startDate || !endDate) {
+            this.showNotification('開始日と終了日の両方を入力してください', 'warning');
+            return;
+        }
+        
+        if (startDate > endDate) {
+            this.showNotification('開始日は終了日より前の日付を選択してください', 'warning');
+            return;
+        }
+        
+        try {
+            this.showLoading('日付範囲検索中...');
+            
+            const data = await apiClient.searchByDateRange(startDate, endDate);
+            
+            if (!data || !data.success) {
+                throw new Error(data?.error || '日付範囲検索に失敗しました');
+            }
+            
+            // 検索結果を表示
+            this.showDateSearchResults(data.results, startDate, endDate);
+            
+        } catch (error) {
+            this.showNotification('日付範囲検索に失敗しました: ' + error.message, 'error');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    showDateSearchResults(results, startDate, endDate) {
+        console.log('日付範囲検索結果:', results?.length || 0, 'メッセージ');
+        
+        // 検索結果をメッセージ表示領域に表示
+        this.elements.messageArea.style.display = 'none';
+        this.elements.virtualScroller.classList.remove('hidden');
+        
+        const scrollContent = document.getElementById('scrollContent');
+        if (!scrollContent) {
+            console.error('scrollContent要素が見つかりません');
+            return;
+        }
+        
+        // 既存のコンテンツをクリア
+        scrollContent.innerHTML = '';
+        
+        if (!results || results.length === 0) {
+            const noResultsDiv = document.createElement('div');
+            noResultsDiv.className = 'no-results';
+            noResultsDiv.innerHTML = `
+                <h3>検索結果が見つかりません</h3>
+                <p>期間: ${startDate} 〜 ${endDate}</p>
+                <p>該当する会話ログがありません。</p>
+            `;
+            scrollContent.appendChild(noResultsDiv);
+            return;
+        }
+        
+        // 日付範囲検索の結果ヘッダーを追加
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'search-results-header';
+        headerDiv.innerHTML = `
+            <h3>📅 日付範囲検索結果</h3>
+            <p>期間: ${startDate} 〜 ${endDate} (${results.length}件のメッセージ)</p>
+        `;
+        scrollContent.appendChild(headerDiv);
+        
+        // メッセージを表示
+        results.forEach((message, index) => {
+            const messageElement = this.createDateSearchMessageElement(message, index);
+            scrollContent.appendChild(messageElement);
+        });
+        
+        this.state.searchMode = true;
+        this.updateFileStatus(`日付範囲検索: ${startDate} 〜 ${endDate} (${results.length}件)`);
+        
+        console.log('日付範囲検索結果表示完了');
+    }
+
+    createDateSearchMessageElement(message, index) {
+        const div = document.createElement('div');
+        div.className = `message ${message.role === 'user' ? 'message-user' : 'message-assistant'}`;
+        
+        const roleIcon = message.role === 'user' ? '👤' : '🤖';
+        const roleName = message.role === 'user' ? 'User' : 'Assistant';
+        const messageNumber = index + 1;
+        
+        // タイムスタンプを適切に処理
+        let timestamp = message.timestamp;
+        if (timestamp) {
+            try {
+                const date = new Date(timestamp);
+                timestamp = date.toLocaleString('ja-JP', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZone: 'Asia/Tokyo'
+                });
+            } catch (e) {
+                console.warn('日時解析エラー:', timestamp, e);
+                timestamp = String(timestamp);
+            }
+        } else {
+            timestamp = '不明';
+        }
+        
+        // コンテンツを処理
+        let content = this.escapeHtml(message.content);
+        content = this.processCodeBlocks(content);
+        
+        // メッセージ全体のテキストをエスケープしてdata属性に格納
+        const messageText = `${roleName}: ${message.content}`;
+        const escapedMessageText = messageText.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        
+        div.innerHTML = `
+            <div class="message-header">
+                <div class="message-role">
+                    <span class="message-number">#${messageNumber}</span>
+                    <span class="role-icon">${roleIcon}</span>
+                    <span class="role-name">${roleName}</span>
+                    <span class="source-file">[${message.file_name}]</span>
+                </div>
+                <div class="message-actions">
+                    <button class="copy-message-btn" onclick="copyMessageToClipboard(this)" data-message="${escapedMessageText}" title="メッセージをコピー">
+                        📋 コピー
+                    </button>
+                    <div class="message-timestamp">${timestamp}</div>
+                </div>
+            </div>
+            <div class="message-content">
+                ${content}
+            </div>
+        `;
+        
+        return div;
     }
     
     async handleBuildCache() {

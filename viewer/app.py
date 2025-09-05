@@ -217,6 +217,49 @@ def search_messages():
         }), 500
 
 
+@app.route('/api/search/date-range')
+def search_messages_by_date_range():
+    """日付範囲による検索"""
+    try:
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        limit = request.args.get('limit', 1000, type=int)
+        
+        if not start_date or not end_date:
+            return jsonify({
+                'success': False,
+                'error': '開始日と終了日の両方を指定してください'
+            })
+        
+        # 日付フォーマット検証（YYYY-MM-DD形式）
+        from datetime import datetime
+        try:
+            datetime.strptime(start_date, '%Y-%m-%d')
+            datetime.strptime(end_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': '日付形式はYYYY-MM-DD形式で入力してください'
+            })
+        
+        # 日付範囲検索実行
+        results = cache.search_messages_by_date_range(start_date, end_date, limit)
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'start_date': start_date,
+            'end_date': end_date,
+            'total': len(results)
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/cache/build', methods=['POST'])
 def build_cache():
     """全ファイルのキャッシュを作成"""
