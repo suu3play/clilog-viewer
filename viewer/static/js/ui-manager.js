@@ -281,7 +281,7 @@ class UIManager {
         if (this.elements.messageArea) {
             this.elements.messageArea.innerHTML = `
                 <div class="welcome-message">
-                    <h2>Claude Log Viewer へようこそ</h2>
+                    <h2>CliLog Viewer へようこそ</h2>
                     <p>すべての会話ログが表示されます。左側の日付ボタンでも確認できます。</p>
                     <div class="features">
                         <div class="feature">

@@ -1,5 +1,5 @@
 @echo off
-echo Claude Log Viewer を起動中...
+echo CliLog Viewer を起動中...
 echo.
 
 REM Python環境確認

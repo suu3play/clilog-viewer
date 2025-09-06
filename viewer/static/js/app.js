@@ -13,7 +13,7 @@ class ChatLogApp {
     }
     
     async init() {
-        console.log('Claude Log Viewer 起動中...');
+        console.log('CliLog Viewer 起動中...');
         
         try {
             // API進捗表示を設定
