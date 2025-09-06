@@ -1,10 +1,10 @@
-# Claude Log Converter & Viewer
+# CliLog Viewer - Multi-AI CLI Log Converter & Viewer
 
-会話ログをMarkdownファイルに変換し、高速チャットビューアーで表示するPythonツール
+AI CLIツールの会話ログをMarkdownファイルに変換し、高速チャットビューアーで表示するPythonツール
 
 ## 概要
 
-このツールは、Claude Codeの会話ログ（JSONL形式）を読みやすいMarkdownファイルに変換し、SQLiteキャッシュによる高速チャットビューアーで表示します。
+このツールは、各種AI CLIツール（Claude Code、GitHub Copilot、ChatGPTなど）の会話ログを読みやすいMarkdownファイルに変換し、SQLiteキャッシュによる高速チャットビューアーで表示します。
 
 ## 機能
 
@@ -34,7 +34,7 @@
 ### インストール
 ```bash
 # プロジェクトをクローンまたはダウンロード
-cd claude-log
+cd clilog-viewer
 
 # チャットビューアー用依存関係インストール（新機能用）
 cd viewer
@@ -103,7 +103,7 @@ tool:TodoWrite             # ツール名検索
 ## プロジェクト構成
 
 ```
-claude-log/
+clilog-viewer/
 ├── log_converter.py          # 既存のログ変換スクリプト
 ├── log_converter_config.ini  # 設定ファイル
 ├── processed_files.json     # 処理済みファイル管理

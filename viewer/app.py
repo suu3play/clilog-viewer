@@ -21,7 +21,7 @@ except ImportError as e:
 app = Flask(__name__)
 
 # 設定
-app.config['SECRET_KEY'] = 'claude-log-viewer-secret-key'
+app.config['SECRET_KEY'] = 'clilog-viewer-secret-key'
 
 def get_database_path():
     """データベースファイルのパスを取得"""
@@ -528,7 +528,7 @@ if __name__ == '__main__':
     init_app()
 
     # 開発用サーバー起動
-    print("Claude Log Viewer 開始中...")
+    print("CliLog Viewer 開始中...")
     print("ブラウザで http://localhost:5000 にアクセスしてください")
 
     app.run(

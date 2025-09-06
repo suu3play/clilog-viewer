@@ -415,7 +415,7 @@ def process_log_line(line):
     return None
 
 
-class ClaudeLogParser(BaseLogParser):
+class ClaudeCliLogParser(BaseLogParser):
     """Claude専用ログパーサー"""
     
     def get_tool_type(self) -> str:
@@ -483,6 +483,154 @@ class ClaudeLogParser(BaseLogParser):
         return None
 
 
+class CopilotLogParser(BaseLogParser):
+    """GitHub Copilot用ログパーサー"""
+    
+    def get_tool_type(self) -> str:
+        return 'copilot'
+    
+    def can_parse(self, file_path: Path) -> bool:
+        """Copilotログファイルかを判定"""
+        path_str = str(file_path).lower()
+        if 'copilot' in path_str and file_path.suffix in ['.log', '.json']:
+            return True
+        
+        # 内容判定
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for i, line in enumerate(f):
+                    if i >= 5:
+                        break
+                    line_lower = line.lower()
+                    if any(keyword in line_lower for keyword in ['copilot', 'completion', 'telemetry']):
+                        return True
+        except Exception:
+            pass
+            
+        return False
+    
+    def parse_line(self, line: str) -> Optional[Dict[str, Any]]:
+        """Copilot形式の1行を解析（基本実装）"""
+        try:
+            # JSON形式の場合
+            if line.strip().startswith('{'):
+                data = json.loads(line.strip())
+                
+                # 基本的なログエントリとして処理
+                timestamp = data.get('timestamp', data.get('time', ''))
+                content = data.get('message', data.get('text', str(data)))
+                
+                if timestamp and content:
+                    return {
+                        'timestamp': timestamp,
+                        'role': 'assistant',
+                        'content': f"[Copilot] {content}",
+                        'tool_type': self.get_tool_type()
+                    }
+            else:
+                # プレーンテキスト形式
+                line_clean = line.strip()
+                if line_clean:
+                    return {
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'role': 'assistant',
+                        'content': f"[Copilot] {line_clean}",
+                        'tool_type': self.get_tool_type()
+                    }
+                    
+        except json.JSONDecodeError:
+            # JSONでない行はそのまま処理
+            line_clean = line.strip()
+            if line_clean:
+                return {
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'role': 'assistant',
+                    'content': f"[Copilot] {line_clean}",
+                    'tool_type': self.get_tool_type()
+                }
+        except Exception as e:
+            print(f"Copilot解析エラー: {e}")
+            
+        return None
+
+
+class ChatGPTLogParser(BaseLogParser):
+    """ChatGPT/OpenAI用ログパーサー"""
+    
+    def get_tool_type(self) -> str:
+        return 'chatgpt'
+    
+    def can_parse(self, file_path: Path) -> bool:
+        """ChatGPTログファイルかを判定"""
+        path_str = str(file_path).lower()
+        if any(keyword in path_str for keyword in ['chatgpt', 'openai', 'gpt']) and file_path.suffix == '.json':
+            return True
+        
+        # 内容判定
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for i, line in enumerate(f):
+                    if i >= 5:
+                        break
+                    line_lower = line.lower()
+                    if any(keyword in line_lower for keyword in ['gpt-', 'openai', 'chatgpt', 'choices', 'usage']):
+                        return True
+        except Exception:
+            pass
+            
+        return False
+    
+    def parse_line(self, line: str) -> Optional[Dict[str, Any]]:
+        """ChatGPT形式の1行を解析（基本実装）"""
+        try:
+            data = json.loads(line.strip())
+            
+            # OpenAI API レスポンス形式
+            if 'choices' in data and data['choices']:
+                choice = data['choices'][0]
+                message = choice.get('message', {})
+                content = message.get('content', '')
+                role = message.get('role', 'assistant')
+                
+                if content:
+                    timestamp = data.get('created')
+                    if timestamp:
+                        # UNIX timestamp -> 人間読み可能形式
+                        dt = datetime.fromtimestamp(timestamp)
+                        timestamp_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    else:
+                        timestamp_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    return {
+                        'timestamp': timestamp_str,
+                        'role': role,
+                        'content': content,
+                        'tool_type': self.get_tool_type()
+                    }
+            
+            # シンプルなメッセージ形式
+            elif 'message' in data or 'content' in data:
+                content = data.get('content', data.get('message', ''))
+                role = data.get('role', 'assistant')
+                timestamp = data.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                
+                if content:
+                    return {
+                        'timestamp': timestamp,
+                        'role': role,
+                        'content': content,
+                        'tool_type': self.get_tool_type()
+                    }
+                    
+        except json.JSONDecodeError:
+            # JSONでない行はスキップ
+            pass
+        except Exception as e:
+            print(f"ChatGPT解析エラー: {e}")
+            
+        return None
+
+
 def generate_output_filename(input_file, output_directory, username=None):
     """出力ファイル名を生成（ユーザー名_日付形式）"""
     # ファイルの更新時刻を取得（UTC）
@@ -540,7 +688,9 @@ class LogParserManager:
     
     def __init__(self):
         self.parsers = [
-            ClaudeLogParser(),
+            ClaudeCliLogParser(),
+            CopilotLogParser(),
+            ChatGPTLogParser(),
         ]
     
     def get_parser(self, file_path: Path, manual_tool_type: Optional[str] = None) -> Optional[BaseLogParser]:
