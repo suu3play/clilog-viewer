@@ -11,6 +11,133 @@ from pathlib import Path
 import configparser
 import os
 import getpass
+from abc import ABC, abstractmethod
+from typing import Optional, List, Dict, Any
+
+
+class BaseLogParser(ABC):
+    """ログパーサーの基底クラス"""
+    
+    @abstractmethod
+    def get_tool_type(self) -> str:
+        """このパーサーが対応するツール種別を返す"""
+        pass
+    
+    @abstractmethod
+    def can_parse(self, file_path: Path) -> bool:
+        """このパーサーがファイルを処理できるかを判定"""
+        pass
+    
+    @abstractmethod
+    def parse_line(self, line: str) -> Optional[Dict[str, Any]]:
+        """1行を解析して会話データを返す"""
+        pass
+    
+    def parse_file(self, file_path: Path) -> List[Dict[str, Any]]:
+        """ファイル全体を解析して会話データのリストを返す"""
+        messages = []
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        parsed = self.parse_line(line)
+                        if parsed:
+                            messages.append(parsed)
+        except Exception as e:
+            print(f"ファイル読み込みエラー: {e}")
+            
+        return messages
+
+
+class ToolDetector:
+    """ツール種別自動判定クラス"""
+    
+    TOOL_PATTERNS = {
+        'claude': [
+            '*/.claude/projects/**/*.jsonl',
+            '**/*claude*.jsonl'
+        ],
+        'copilot': [
+            '**/copilot*.log',
+            '**/github_copilot.log',
+            '**/.vscode/copilot*.log'
+        ],
+        'chatgpt': [
+            '**/chatgpt*.json',
+            '**/openai*.log',
+            '**/gpt*.json'
+        ]
+    }
+    
+    TOOL_SIGNATURES = {
+        'claude': ['userType', 'message', 'role'],
+        'copilot': ['completion', 'telemetry', 'completions'],
+        'chatgpt': ['model', 'choices', 'usage', 'gpt-']
+    }
+    
+    @classmethod
+    def detect_by_path(cls, file_path: Path) -> Optional[str]:
+        """ファイルパスからツール種別を判定"""
+        path_str = str(file_path).lower()
+        
+        for tool_type, patterns in cls.TOOL_PATTERNS.items():
+            for pattern in patterns:
+                pattern_lower = pattern.lower()
+                # 簡易パターンマッチング
+                if 'claude' in pattern_lower and 'claude' in path_str:
+                    return tool_type
+                elif 'copilot' in pattern_lower and 'copilot' in path_str:
+                    return tool_type
+                elif ('chatgpt' in pattern_lower or 'gpt' in pattern_lower) and ('chatgpt' in path_str or 'gpt' in path_str):
+                    return tool_type
+        
+        return None
+    
+    @classmethod
+    def detect_by_content(cls, file_path: Path, sample_lines: int = 10) -> Optional[str]:
+        """ファイル内容からツール種別を判定"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content_sample = ""
+                for i, line in enumerate(f):
+                    if i >= sample_lines:
+                        break
+                    content_sample += line.lower()
+                
+                # 各ツールの特徴的なキーワードをカウント
+                scores = {}
+                for tool_type, signatures in cls.TOOL_SIGNATURES.items():
+                    score = sum(content_sample.count(sig.lower()) for sig in signatures)
+                    if score > 0:
+                        scores[tool_type] = score
+                
+                # 最も高いスコアのツール種別を返す
+                if scores:
+                    return max(scores.items(), key=lambda x: x[1])[0]
+                    
+        except Exception as e:
+            print(f"内容判定エラー: {e}")
+            
+        return None
+    
+    @classmethod
+    def detect_tool_type(cls, file_path: Path, manual_override: Optional[str] = None) -> str:
+        """総合的にツール種別を判定"""
+        if manual_override:
+            return manual_override
+            
+        # 1. パスによる判定
+        tool_type = cls.detect_by_path(file_path)
+        if tool_type:
+            return tool_type
+            
+        # 2. 内容による判定
+        tool_type = cls.detect_by_content(file_path)
+        if tool_type:
+            return tool_type
+            
+        # 3. デフォルトは unknown
+        return 'unknown'
 
 
 def format_timestamp(timestamp_str):
@@ -64,8 +191,8 @@ class LogDatabase:
     def init_database(self):
         """データベーススキーマを初期化"""
         with sqlite3.connect(self.db_path) as conn:
-            conn.executescript('''
-                -- 読み取りファイルテーブル
+            # 基本テーブル作成
+            conn.execute('''
                 CREATE TABLE IF NOT EXISTS log_files (
                     id INTEGER PRIMARY KEY,
                     filename TEXT UNIQUE NOT NULL,
@@ -73,24 +200,52 @@ class LogDatabase:
                     last_modified INTEGER NOT NULL,
                     file_hash TEXT NOT NULL,
                     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-
-                -- 会話データテーブル
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id INTEGER PRIMARY KEY,
-                    log_file_id INTEGER REFERENCES log_files(id),
-                    role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
-                    timestamp TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    filename TEXT NOT NULL
-                );
-
-                -- インデックス作成
-                CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
-                CREATE INDEX IF NOT EXISTS idx_conversations_role ON conversations(role);
-                CREATE INDEX IF NOT EXISTS idx_conversations_filename ON conversations(filename);
-                CREATE INDEX IF NOT EXISTS idx_log_files_modified ON log_files(last_modified);
+                )
             ''')
+            
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS tool_types (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL,
+                    description TEXT
+                )
+            ''')
+            
+            # 既存のconversationsテーブルの構造確認
+            cursor = conn.execute("PRAGMA table_info(conversations)")
+            columns = [row[1] for row in cursor.fetchall()]
+            
+            if not columns:
+                # 新規作成
+                conn.execute('''
+                    CREATE TABLE conversations (
+                        id INTEGER PRIMARY KEY,
+                        log_file_id INTEGER REFERENCES log_files(id),
+                        role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+                        timestamp TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        filename TEXT NOT NULL,
+                        tool_type TEXT DEFAULT 'claude'
+                    )
+                ''')
+            elif 'tool_type' not in columns:
+                # マイグレーション：tool_typeカラム追加
+                print("  → データベースをマイグレーション中（tool_typeカラム追加）")
+                conn.execute("ALTER TABLE conversations ADD COLUMN tool_type TEXT DEFAULT 'claude'")
+                conn.execute("UPDATE conversations SET tool_type = 'claude' WHERE tool_type IS NULL OR tool_type = ''")
+            
+            # インデックス作成
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_role ON conversations(role)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_filename ON conversations(filename)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_tool_type ON conversations(tool_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_log_files_modified ON log_files(last_modified)")
+
+            # ツール種別の初期データ投入
+            conn.execute("INSERT OR IGNORE INTO tool_types (name, description) VALUES ('claude', 'Claude Code ログファイル')")
+            conn.execute("INSERT OR IGNORE INTO tool_types (name, description) VALUES ('copilot', 'GitHub Copilot ログファイル')")
+            conn.execute("INSERT OR IGNORE INTO tool_types (name, description) VALUES ('chatgpt', 'ChatGPT ログファイル')")
+            conn.execute("INSERT OR IGNORE INTO tool_types (name, description) VALUES ('unknown', '不明なツールのログファイル')")
     
     def get_file_hash(self, file_path):
         """ファイルのハッシュ値を計算"""
@@ -137,14 +292,14 @@ class LogDatabase:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('DELETE FROM conversations WHERE log_file_id = ?', (log_file_id,))
     
-    def insert_conversation(self, log_file_id, role, timestamp, content, filename):
+    def insert_conversation(self, log_file_id, role, timestamp, content, filename, tool_type='claude'):
         """会話データを登録"""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
                 INSERT INTO conversations 
-                (log_file_id, role, timestamp, content, filename)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (log_file_id, role, timestamp, content, filename))
+                (log_file_id, role, timestamp, content, filename, tool_type)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (log_file_id, role, timestamp, content, filename, tool_type))
     
     def get_conversations_in_range(self, start_date=None, end_date=None):
         """指定された日付範囲の会話データを取得"""
@@ -260,6 +415,74 @@ def process_log_line(line):
     return None
 
 
+class ClaudeLogParser(BaseLogParser):
+    """Claude専用ログパーサー"""
+    
+    def get_tool_type(self) -> str:
+        return 'claude'
+    
+    def can_parse(self, file_path: Path) -> bool:
+        """Claudeログファイルかを判定"""
+        # パス判定
+        path_str = str(file_path).lower()
+        if '.claude' in path_str and file_path.suffix == '.jsonl':
+            return True
+        
+        # 内容判定（最初の数行をチェック）
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for i, line in enumerate(f):
+                    if i >= 3:  # 最初の3行のみチェック
+                        break
+                    try:
+                        data = json.loads(line.strip())
+                        # Claudeの特徴的な構造をチェック
+                        if 'userType' in data or ('message' in data and 'role' in data.get('message', {})):
+                            return True
+                    except json.JSONDecodeError:
+                        continue
+        except Exception:
+            pass
+            
+        return False
+    
+    def parse_line(self, line: str) -> Optional[Dict[str, Any]]:
+        """Claude形式の1行を解析"""
+        try:
+            data = json.loads(line.strip())
+            
+            # 基本情報の抽出
+            timestamp = data.get('timestamp', '')
+            user_type = data.get('userType', data.get('type', ''))
+            
+            # メッセージ内容の抽出
+            message_data = data.get('message', {})
+            role = message_data.get('role', user_type)
+            content = extract_content(message_data)
+            
+            # ユーザーまたはアシスタントのメッセージのみ処理
+            if role in ['user', 'assistant'] and content:
+                content = clean_text(content)
+                if content:  # 空でない場合のみ返す
+                    # UTCタイムスタンプをJSTに変換
+                    jst_timestamp = convert_utc_to_jst(timestamp)
+                    return {
+                        'timestamp': jst_timestamp,  # JST形式で保存
+                        'role': role,
+                        'content': content,
+                        'tool_type': self.get_tool_type()
+                    }
+        
+        except json.JSONDecodeError:
+            # JSON以外の行は無視
+            pass
+        except Exception as e:
+            print(f"エラー: {e}")
+            print(f"問題のある行: {line[:100]}...")
+        
+        return None
+
+
 def generate_output_filename(input_file, output_directory, username=None):
     """出力ファイル名を生成（ユーザー名_日付形式）"""
     # ファイルの更新時刻を取得（UTC）
@@ -312,14 +535,51 @@ def should_process_file(input_file, processed_info):
     return True
 
 
-def process_log_file_to_database(file_path, database):
-    """ログファイルを読み込んでデータベースに登録"""
-    messages = []
+class LogParserManager:
+    """ログパーサー管理クラス"""
+    
+    def __init__(self):
+        self.parsers = [
+            ClaudeLogParser(),
+        ]
+    
+    def get_parser(self, file_path: Path, manual_tool_type: Optional[str] = None) -> Optional[BaseLogParser]:
+        """ファイルに適したパーサーを取得"""
+        # 手動指定がある場合
+        if manual_tool_type:
+            for parser in self.parsers:
+                if parser.get_tool_type() == manual_tool_type:
+                    return parser
+        
+        # 自動判定
+        for parser in self.parsers:
+            if parser.can_parse(file_path):
+                return parser
+                
+        # 見つからない場合はデフォルト（Claude）
+        return self.parsers[0] if self.parsers else None
+
+
+def process_log_file_to_database(file_path, database, manual_tool_type: Optional[str] = None):
+    """ログファイルを読み込んでデータベースに登録（新バージョン）"""
     filename = file_path.name
     
-    print(f"  → ファイルを読み込み中...")
+    print(f"  → ファイルを解析中...")
     
-    # ログファイルを読み込み
+    # 適切なパーサーを取得
+    parser_manager = LogParserManager()
+    parser = parser_manager.get_parser(file_path, manual_tool_type)
+    
+    if not parser:
+        print(f"  → 対応するパーサーが見つかりません")
+        return False, 0
+    
+    # ツール種別を自動判定
+    detected_tool_type = ToolDetector.detect_tool_type(file_path, manual_tool_type)
+    print(f"  → 検出されたツール種別: {detected_tool_type}")
+    
+    # ファイルを解析
+    messages = []
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -328,9 +588,11 @@ def process_log_file_to_database(file_path, database):
             
             for i, line in enumerate(lines, 1):
                 if line.strip():
-                    processed = process_log_line(line)
-                    if processed:
-                        messages.append(processed)
+                    parsed = parser.parse_line(line)
+                    if parsed:
+                        # tool_typeを確実にセット
+                        parsed['tool_type'] = detected_tool_type
+                        messages.append(parsed)
                 
                 # 100行ごとに進捗表示
                 if i % 100 == 0 or i == total_lines:
@@ -365,19 +627,19 @@ def process_log_file_to_database(file_path, database):
             for i in range(0, len(messages), batch_size):
                 batch = messages[i:i + batch_size]
                 
-                # バッチでINSERT
+                # バッチでINSERT（tool_type含む）
                 conn.executemany('''
                     INSERT INTO conversations 
-                    (log_file_id, role, timestamp, content, filename)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', [(log_file_id, msg['role'], msg['timestamp'], msg['content'], filename) 
+                    (log_file_id, role, timestamp, content, filename, tool_type)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', [(log_file_id, msg['role'], msg['timestamp'], msg['content'], filename, msg['tool_type']) 
                       for msg in batch])
                 
                 # 進捗表示
                 processed_count = min(i + batch_size, len(messages))
                 print(f"    登録進捗: {processed_count}/{len(messages)}件 ({processed_count/len(messages)*100:.1f}%)")
         
-        print(f"  [OK] 登録完了: {len(messages)}件の会話データ")
+        print(f"  [OK] 登録完了: {len(messages)}件の会話データ（ツール種別: {detected_tool_type}）")
         return True, len(messages)  # 登録件数を返す
         
     except Exception as e:
@@ -553,7 +815,7 @@ def select_log_file(files):
             return None
 
 
-def process_multiple_files_to_database(files, database):
+def process_multiple_files_to_database(files, database, manual_tool_type: Optional[str] = None):
     """複数ファイルをデータベースに一括処理"""
     processed_count = 0
     skipped_count = 0
@@ -578,7 +840,7 @@ def process_multiple_files_to_database(files, database):
             cursor = conn.execute('SELECT COUNT(*) FROM conversations')
             before_count = cursor.fetchone()[0]
         
-        success, conversation_count = process_log_file_to_database(file, database)
+        success, conversation_count = process_log_file_to_database(file, database, manual_tool_type)
         if success:
             processed_count += 1
             if conversation_count > 0:
@@ -610,6 +872,7 @@ def main():
     parser.add_argument('--json-start-date', help='JSON出力の開始日（YYYY-MM-DD形式、会話日時基準）')
     parser.add_argument('--json-end-date', help='JSON出力の終了日（YYYY-MM-DD形式、会話日時基準）')
     parser.add_argument('--db-path', help='データベースファイルパス（デフォルト: log_data.db）')
+    parser.add_argument('--tool-type', help='ツール種別を手動指定（claude, copilot, chatgpt, unknown）')
     
     args = parser.parse_args()
     
@@ -674,7 +937,7 @@ def main():
             conn.execute('DELETE FROM log_files')
     
     # ファイルをデータベースに処理
-    success = process_multiple_files_to_database(files, database)
+    success = process_multiple_files_to_database(files, database, args.tool_type)
     if not success:
         print("ファイル処理に失敗しました。")
         exit(1)
