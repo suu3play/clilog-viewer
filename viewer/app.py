@@ -277,7 +277,6 @@ def search_messages_by_date_range():
                 'error': '日付形式はYYYY-MM-DD形式で入力してください'
             })
 
-        print(f"検索日付範囲: {start_date} 〜 {end_date}")
         # データベースから日付範囲検索実行
         import sqlite3
         results = []
