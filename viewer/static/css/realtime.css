@@ -1,0 +1,289 @@
+/**
+ * リアルタイムビューワー専用スタイル
+ */
+
+/* モード切り替え */
+.mode-selector {
+    display: flex;
+    gap: 8px;
+    margin-right: 16px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.mode-btn {
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.mode-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.mode-btn.active {
+    background: var(--accent-color);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+/* ファイル選択 */
+.file-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 16px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+}
+
+.file-dropdown {
+    min-width: 200px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.file-dropdown:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+}
+
+.refresh-btn {
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.refresh-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    transform: rotate(180deg);
+}
+
+/* 接続ステータス */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.status-indicator {
+    font-size: 8px;
+    line-height: 1;
+}
+
+.status-indicator.status-default {
+    color: var(--text-muted);
+}
+
+.status-indicator.status-success {
+    color: #28a745;
+}
+
+.status-indicator.status-error {
+    color: #dc3545;
+}
+
+.status-indicator.status-warning {
+    color: #ffc107;
+}
+
+.status-indicator.status-loading {
+    color: var(--accent-color);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* メッセージ表示（リアルタイムモード） */
+.messages-container {
+    padding: 16px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.message {
+    margin-bottom: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid var(--border-color);
+    background: var(--bg-secondary);
+    animation: messageAppear 0.3s ease-out;
+}
+
+.message-user {
+    border-left-color: var(--user-color, #28a745);
+    background: var(--user-bg, rgba(40, 167, 69, 0.1));
+}
+
+.message-assistant {
+    border-left-color: var(--assistant-color, #007bff);
+    background: var(--assistant-bg, rgba(0, 123, 255, 0.1));
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.role {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timestamp {
+    color: var(--text-muted);
+}
+
+.message-content {
+    color: var(--text-primary);
+    line-height: 1.6;
+    word-wrap: break-word;
+}
+
+/* コードブロック */
+.code-block {
+    background: var(--code-bg, #2d3748);
+    color: var(--code-text, #e2e8f0);
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.code-block.json {
+    border-left: 3px solid #f39c12;
+}
+
+.inline-code {
+    background: var(--inline-code-bg, rgba(255, 255, 255, 0.1));
+    color: var(--accent-color);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 85%;
+}
+
+/* アニメーション */
+@keyframes messageAppear {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .mode-selector {
+        margin-right: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .mode-btn {
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    
+    .file-selector {
+        margin-right: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .file-dropdown {
+        min-width: 150px;
+        font-size: 12px;
+    }
+    
+    .messages-container {
+        padding: 12px;
+        max-height: calc(100vh - 250px);
+    }
+    
+    .message {
+        margin-bottom: 12px;
+        padding: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .mode-selector {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .file-selector {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+    
+    .file-dropdown {
+        min-width: auto;
+    }
+    
+    .connection-status {
+        justify-content: center;
+    }
+}
+
+/* ダークテーマ */
+[data-theme="dark"] {
+    --user-color: #4ade80;
+    --user-bg: rgba(74, 222, 128, 0.1);
+    --assistant-color: #60a5fa;
+    --assistant-bg: rgba(96, 165, 250, 0.1);
+    --code-bg: #1e293b;
+    --code-text: #f1f5f9;
+    --inline-code-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* ライトテーマ */
+[data-theme="light"] {
+    --user-color: #059669;
+    --user-bg: rgba(5, 150, 105, 0.1);
+    --assistant-color: #2563eb;
+    --assistant-bg: rgba(37, 99, 235, 0.1);
+    --code-bg: #f8fafc;
+    --code-text: #334155;
+    --inline-code-bg: rgba(0, 0, 0, 0.1);
+}

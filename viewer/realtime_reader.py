@@ -9,8 +9,15 @@ import time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Callable
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+    WATCHDOG_AVAILABLE = True
+except ImportError:
+    Observer = None
+    FileSystemEventHandler = None
+    WATCHDOG_AVAILABLE = False
+    print("警告: watchdogライブラリが利用できません。ファイル監視機能は無効です。")
 import threading
 
 
@@ -207,7 +214,7 @@ class RealtimeFileMonitor:
     def __init__(self, watch_directory: Path, callback: Callable = None):
         self.watch_directory = Path(watch_directory)
         self.callback = callback
-        self.observer = Observer()
+        self.observer = Observer() if WATCHDOG_AVAILABLE else None
         self.is_monitoring = False
         self.readers = {}  # file_path -> JSONLFileReader
         
@@ -215,20 +222,31 @@ class RealtimeFileMonitor:
         """監視を開始"""
         if self.is_monitoring:
             return
+            
+        if not WATCHDOG_AVAILABLE:
+            print("ファイル監視: watchdogライブラリが無効のため監視を開始できません")
+            return
         
-        event_handler = FileChangeHandler(self.callback)
-        self.observer.schedule(event_handler, str(self.watch_directory), recursive=True)
-        self.observer.start()
-        self.is_monitoring = True
-        print(f"ファイル監視開始: {self.watch_directory}")
+        try:
+            event_handler = FileChangeHandler(self.callback)
+            self.observer.schedule(event_handler, str(self.watch_directory), recursive=True)
+            self.observer.start()
+            self.is_monitoring = True
+            print(f"ファイル監視開始: {self.watch_directory}")
+        except Exception as e:
+            print(f"ファイル監視開始エラー: {e}")
+            print("ファイル監視なしでリアルタイム機能を続行します")
     
     def stop_monitoring(self):
         """監視を停止"""
-        if self.is_monitoring:
-            self.observer.stop()
-            self.observer.join()
-            self.is_monitoring = False
-            print("ファイル監視停止")
+        if self.is_monitoring and self.observer:
+            try:
+                self.observer.stop()
+                self.observer.join()
+                self.is_monitoring = False
+                print("ファイル監視停止")
+            except Exception as e:
+                print(f"ファイル監視停止エラー: {e}")
     
     def get_jsonl_files(self) -> List[Dict[str, Any]]:
         """監視ディレクトリ内のJSONLファイル一覧を取得"""
@@ -254,31 +272,42 @@ class RealtimeFileMonitor:
         return self.readers[file_key]
 
 
-class FileChangeHandler(FileSystemEventHandler):
-    """ファイル変更イベントハンドラー"""
-    
-    def __init__(self, callback: Callable = None):
-        self.callback = callback
-        self.last_modified = {}
+# FileSystemEventHandlerが利用できる場合とできない場合の代替クラス
+if WATCHDOG_AVAILABLE and FileSystemEventHandler:
+    class FileChangeHandler(FileSystemEventHandler):
+        """ファイル変更イベントハンドラー（watchdog使用）"""
         
-    def on_modified(self, event):
-        """ファイル変更時の処理"""
-        if event.is_directory or not event.src_path.endswith('.jsonl'):
-            return
-        
-        # 重複イベントを防ぐ
-        current_time = time.time()
-        if event.src_path in self.last_modified:
-            if current_time - self.last_modified[event.src_path] < 1.0:  # 1秒以内は無視
+        def __init__(self, callback: Callable = None):
+            super().__init__()
+            self.callback = callback
+            self.last_modified = {}
+            
+        def on_modified(self, event):
+            """ファイル変更時の処理"""
+            if event.is_directory or not event.src_path.endswith('.jsonl'):
                 return
+            
+            # 重複イベントを防ぐ
+            current_time = time.time()
+            if event.src_path in self.last_modified:
+                if current_time - self.last_modified[event.src_path] < 1.0:  # 1秒以内は無視
+                    return
+            
+            self.last_modified[event.src_path] = current_time
+            
+            if self.callback:
+                try:
+                    self.callback(event.src_path, 'modified')
+                except Exception as e:
+                    print(f"コールバックエラー: {e}")
+else:
+    class FileChangeHandler:
+        """ファイル変更イベントハンドラー（watchdog無効時）"""
         
-        self.last_modified[event.src_path] = current_time
-        
-        if self.callback:
-            try:
-                self.callback(event.src_path, 'modified')
-            except Exception as e:
-                print(f"コールバックエラー: {e}")
+        def __init__(self, callback: Callable = None):
+            self.callback = callback
+            self.last_modified = {}
+            print("ファイル変更イベントハンドラー: watchdog無効モードで初期化")
 
 
 class RealtimeManager:
@@ -294,11 +323,18 @@ class RealtimeManager:
         
     def start(self):
         """リアルタイム監視を開始"""
-        self.monitor.start_monitoring()
+        try:
+            self.monitor.start_monitoring()
+        except Exception as e:
+            print(f"監視開始エラー: {e}")
+            print("ファイル監視なしでリアルタイム機能を続行します")
         
     def stop(self):
         """リアルタイム監視を停止"""
-        self.monitor.stop_monitoring()
+        try:
+            self.monitor.stop_monitoring()
+        except Exception as e:
+            print(f"監視停止エラー: {e}")
         
     def get_available_files(self) -> List[Dict[str, Any]]:
         """利用可能なJSONLファイル一覧を取得"""
