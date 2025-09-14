@@ -402,8 +402,13 @@ class RealtimeClient {
     }
 
     scrollToBottom() {
-        if (this.elements.messageArea) {
-            this.elements.messageArea.scrollTop = this.elements.messageArea.scrollHeight;
+        if (window.ScrollUtils) {
+            window.ScrollUtils.scrollToBottom(this.elements.messageArea);
+        } else {
+            // フォールバック処理
+            if (this.elements.messageArea) {
+                this.elements.messageArea.scrollTop = this.elements.messageArea.scrollHeight;
+            }
         }
     }
 
