@@ -38,6 +38,27 @@
                         </div>
                     </div>
 
+                    <!-- ポーリング制御（リアルタイムモード用） -->
+                    <div id="pollingControls" class="polling-controls hidden">
+                        <div class="polling-toggle-container">
+                            <label class="polling-toggle-label">
+                                <input type="checkbox" id="pollingToggle" class="polling-toggle">
+                                <span class="toggle-slider"></span>
+                                自動更新
+                            </label>
+                        </div>
+                        <div class="polling-interval-container">
+                            <label for="pollingInterval">間隔:</label>
+                            <select id="pollingInterval" class="polling-interval">
+                                <option value="3">3秒</option>
+                                <option value="5" selected>5秒</option>
+                                <option value="10">10秒</option>
+                                <option value="30">30秒</option>
+                                <option value="60">1分</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div class="search-container">
                         <input type="text" id="searchInput" placeholder="メッセージを検索..." class="search-input">
                         <button id="searchBtn" class="search-btn">🔍</button>
@@ -153,6 +174,7 @@
     <script src="/static/js/api-client.js"></script>
     <script src="/static/js/ui-manager.js"></script>
     <script src="/static/js/realtime-client.js"></script>
+    <script src="/static/js/polling-client.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>

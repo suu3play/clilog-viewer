@@ -661,6 +661,193 @@ def get_latest_realtime_file():
         }), 500
 
 
+# ===== ポーリング専用API =====
+
+@app.route('/api/polling/status')
+def get_polling_status():
+    """ポーリング機能のステータス確認"""
+    try:
+        if realtime_manager is None:
+            return jsonify({
+                'success': False,
+                'error': 'リアルタイム機能が利用できません',
+                'polling_available': False
+            }), 500
+
+        files = realtime_manager.get_available_files()
+        latest_file = realtime_manager.get_latest_file()
+
+        return jsonify({
+            'success': True,
+            'polling_available': True,
+            'files_count': len(files),
+            'latest_file': latest_file['name'] if latest_file else None,
+            'watch_directory': str(realtime_manager.claude_projects_dir)
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'polling_available': False
+        }), 500
+
+
+@app.route('/api/polling/latest')
+def get_polling_latest():
+    """ポーリング用：最新ファイルの最新メッセージを取得"""
+    try:
+        if realtime_manager is None:
+            return jsonify({
+                'success': False,
+                'error': 'リアルタイム機能が利用できません'
+            }), 500
+
+        # リクエストパラメータ
+        limit = request.args.get('limit', 20, type=int)
+        since_timestamp = request.args.get('since')  # ISO形式のタイムスタンプ
+
+        latest_file = realtime_manager.get_latest_file()
+        if not latest_file:
+            return jsonify({
+                'success': True,  # ファイルがないのは正常状態
+                'messages': [],
+                'file_info': None,
+                'has_updates': False
+            })
+
+        # メッセージ取得
+        messages = realtime_manager.read_file_messages(
+            latest_file['path'],
+            limit=limit,
+            latest_only=True
+        )
+
+        # since_timestampが指定されている場合、それ以降のメッセージのみフィルタ
+        has_updates = False
+        if since_timestamp and messages:
+            from datetime import datetime
+            try:
+                since_dt = datetime.fromisoformat(since_timestamp.replace('Z', '+00:00'))
+                # UTC時刻をJSTに変換してメッセージのタイムスタンプと比較
+                from datetime import timezone, timedelta
+                jst = timezone(timedelta(hours=9))
+                since_jst = since_dt.astimezone(jst)
+                since_str = since_jst.strftime('%Y-%m-%d %H:%M:%S')
+
+                # since_timestamp以降の新しいメッセージのみフィルタ
+                new_messages = []
+                for msg in messages:
+                    if msg['timestamp'] > since_str:
+                        new_messages.append(msg)
+                        has_updates = True
+
+                if has_updates:
+                    messages = new_messages
+                else:
+                    messages = []
+
+            except (ValueError, AttributeError):
+                # タイムスタンプ解析エラー時は全メッセージを返す
+                has_updates = len(messages) > 0
+
+        else:
+            has_updates = len(messages) > 0
+
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'file_info': latest_file,
+            'has_updates': has_updates,
+            'total': len(messages),
+            'limit': limit,
+            'since_timestamp': since_timestamp
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/polling/file/<path:file_name>')
+def get_polling_file_messages(file_name):
+    """ポーリング用：指定ファイルの最新メッセージを取得"""
+    try:
+        if realtime_manager is None:
+            return jsonify({
+                'success': False,
+                'error': 'リアルタイム機能が利用できません'
+            }), 500
+
+        # リクエストパラメータ
+        limit = request.args.get('limit', 20, type=int)
+        since_timestamp = request.args.get('since')
+
+        # ファイル存在確認
+        files = realtime_manager.get_available_files()
+        target_file = None
+        for file_info in files:
+            if file_info['name'] == file_name:
+                target_file = file_info
+                break
+
+        if not target_file:
+            return jsonify({
+                'success': False,
+                'error': f'ファイルが見つかりません: {file_name}'
+            }), 404
+
+        # メッセージ取得
+        messages = realtime_manager.read_file_messages(
+            target_file['path'],
+            limit=limit,
+            latest_only=True
+        )
+
+        # since_timestampでフィルタリング
+        has_updates = False
+        if since_timestamp and messages:
+            from datetime import datetime
+            try:
+                since_dt = datetime.fromisoformat(since_timestamp.replace('Z', '+00:00'))
+                # UTC時刻をJSTに変換してメッセージのタイムスタンプと比較
+                from datetime import timezone, timedelta
+                jst = timezone(timedelta(hours=9))
+                since_jst = since_dt.astimezone(jst)
+                since_str = since_jst.strftime('%Y-%m-%d %H:%M:%S')
+
+                new_messages = []
+                for msg in messages:
+                    if msg['timestamp'] > since_str:
+                        new_messages.append(msg)
+                        has_updates = True
+
+                messages = new_messages if has_updates else []
+
+            except (ValueError, AttributeError):
+                has_updates = len(messages) > 0
+        else:
+            has_updates = len(messages) > 0
+
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'file_info': target_file,
+            'has_updates': has_updates,
+            'total': len(messages),
+            'limit': limit,
+            'since_timestamp': since_timestamp
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 # ===== WebSocket エンドポイント =====
 
 @socketio.on('connect')
