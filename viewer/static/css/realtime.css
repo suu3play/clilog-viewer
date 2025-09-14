@@ -1,5 +1,6 @@
 /**
  * リアルタイムビューワー専用スタイル
+ * ポーリング機能対応
  */
 
 /* モード切り替え */
@@ -286,4 +287,116 @@
     --code-bg: #f8fafc;
     --code-text: #334155;
     --inline-code-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* ポーリング制御 */
+.polling-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-right: 16px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+}
+
+.polling-toggle-container {
+    display: flex;
+    align-items: center;
+}
+
+.polling-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.polling-toggle {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    appearance: none;
+    background: #ccc;
+    border-radius: 10px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.polling-toggle:checked {
+    background: var(--accent-color);
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    pointer-events: none;
+}
+
+.polling-toggle:checked + .toggle-slider {
+    transform: translateX(20px);
+}
+
+.polling-interval-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.polling-interval-container label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.polling-interval {
+    padding: 4px 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.polling-interval:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+/* ポーリングモード時の追加スタイル */
+.polling-active .status-indicator.status-success {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .polling-controls {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+    }
+
+    .polling-toggle-container,
+    .polling-interval-container {
+        width: 100%;
+        justify-content: space-between;
+    }
 }

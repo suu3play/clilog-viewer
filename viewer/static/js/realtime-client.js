@@ -75,9 +75,24 @@ class RealtimeClient {
         if (this.currentMode === 'realtime') {
             this.elements.fileSelector?.classList.remove('hidden');
             this.elements.dateSearchContainer?.classList.add('hidden');
+
+            // ポーリング制御も表示
+            const pollingControls = document.getElementById('pollingControls');
+            pollingControls?.classList.remove('hidden');
         } else {
             this.elements.fileSelector?.classList.add('hidden');
             this.elements.dateSearchContainer?.classList.remove('hidden');
+
+            // ポーリング制御を非表示
+            const pollingControls = document.getElementById('pollingControls');
+            pollingControls?.classList.add('hidden');
+
+            // ポーリングが動作中なら停止
+            if (window.pollingClient && window.pollingClient.isPollingActive()) {
+                window.pollingClient.stopPolling();
+                const pollingToggle = document.getElementById('pollingToggle');
+                if (pollingToggle) pollingToggle.checked = false;
+            }
         }
         
         // メッセージエリアをクリア
