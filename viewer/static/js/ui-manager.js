@@ -267,13 +267,22 @@ class UIManager {
 
         this.elements.messageArea.appendChild(chatContainer);
 
-        // 最後のメッセージまでスクロール
-        setTimeout(() => {
-            this.elements.messageArea.scrollTop =
-                this.elements.messageArea.scrollHeight;
-        }, 100);
+        // 最後のメッセージまでスクロール（確実にDOM更新後に実行）
+        this.scrollToBottom();
 
         this.state.currentMessages = messages;
+    }
+
+    scrollToBottom() {
+        if (window.ScrollUtils) {
+            window.ScrollUtils.scrollMessageAreaToBottom();
+        } else {
+            // フォールバック処理
+            if (!this.elements.messageArea) return;
+            setTimeout(() => {
+                this.elements.messageArea.scrollTop = this.elements.messageArea.scrollHeight;
+            }, 100);
+        }
     }
 
     // その他のヘルパーメソッド

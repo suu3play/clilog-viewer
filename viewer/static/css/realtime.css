@@ -126,8 +126,7 @@
 /* メッセージ表示（リアルタイムモード） */
 .messages-container {
     padding: 16px;
-    max-height: calc(100vh - 200px);
-    overflow-y: auto;
+    height: 100%;
 }
 
 .message {
