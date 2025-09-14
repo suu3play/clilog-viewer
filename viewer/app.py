@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 会話ログビューアー Flask アプリケーション
-SQLiteデータベースからの会話データ表示
+SQLiteデータベース + リアルタイムJSONL読み取り対応
 """
 import os
 import sys
 import json
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask_socketio import SocketIO, emit
 
 # 親ディレクトリのlog_converter.pyからクラスをインポート
 sys.path.append(str(Path(__file__).parent.parent))
@@ -18,7 +19,15 @@ except ImportError as e:
     Config = None
     LogDatabase = None
 
+# リアルタイム機能のインポート
+try:
+    from realtime_reader import RealtimeManager
+except ImportError as e:
+    print(f"警告: realtime_reader.pyの読み込みに失敗しました: {e}")
+    RealtimeManager = None
+
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # 設定
 app.config['SECRET_KEY'] = 'clilog-viewer-secret-key'
@@ -58,6 +67,26 @@ DB_PATH = get_database_path()
 
 # グローバルデータベースインスタンス
 database = LogDatabase(str(DB_PATH)) if LogDatabase else None
+
+# リアルタイムマネージャー初期化
+realtime_manager = RealtimeManager() if RealtimeManager else None
+
+def websocket_callback(file_path: str, messages):
+    """ファイル変更時のWebSocket通知"""
+    try:
+        socketio.emit('file_update', {
+            'file_path': file_path,
+            'messages': messages,
+            'timestamp': messages[-1]['timestamp'] if messages else None
+        })
+    except Exception as e:
+        print(f"WebSocket通知エラー: {e}")
+
+# リアルタイム監視開始
+if realtime_manager:
+    realtime_manager.add_change_callback(websocket_callback)
+    realtime_manager.start()
+    print("リアルタイム監視を開始しました")
 
 
 @app.route('/')
@@ -505,6 +534,187 @@ def internal_error(error):
     }), 500
 
 
+# ===== リアルタイム機能用エンドポイント =====
+
+@app.route('/api/realtime/files')
+def get_realtime_files():
+    """リアルタイム読み取り用JSONLファイル一覧を取得"""
+    try:
+        if realtime_manager is None:
+            return jsonify({
+                'success': False,
+                'error': 'リアルタイム機能が利用できません'
+            }), 500
+
+        files = realtime_manager.get_available_files()
+        
+        # 相対パス表示用に調整
+        for file in files:
+            try:
+                relative_path = str(Path(file['path']).relative_to(Path.home()))
+                file['display_path'] = relative_path
+            except ValueError:
+                file['display_path'] = file['path']
+
+        return jsonify({
+            'success': True,
+            'files': files,
+            'total': len(files),
+            'mode': 'realtime'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/realtime/messages/<path:file_name>')
+def get_realtime_messages(file_name):
+    """リアルタイムJSONLファイルからメッセージを取得"""
+    try:
+        if realtime_manager is None:
+            return jsonify({
+                'success': False,
+                'error': 'リアルタイム機能が利用できません'
+            }), 500
+
+        # ファイルパスの特定
+        available_files = realtime_manager.get_available_files()
+        target_file = None
+        
+        for file in available_files:
+            if file['name'] == file_name or file['path'].endswith(file_name):
+                target_file = file
+                break
+        
+        if not target_file:
+            return jsonify({
+                'success': False,
+                'error': f'ファイルが見つかりません: {file_name}'
+            }), 404
+
+        # パラメータ取得
+        limit = request.args.get('limit', 50, type=int)
+        latest_only = request.args.get('latest_only', 'true').lower() == 'true'
+
+        # メッセージ読み取り
+        messages = realtime_manager.read_file_messages(
+            target_file['path'], 
+            limit=limit, 
+            latest_only=latest_only
+        )
+
+        return jsonify({
+            'success': True,
+            'messages': messages,
+            'file_info': target_file,
+            'total': len(messages),
+            'mode': 'realtime'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/realtime/latest')
+def get_latest_realtime_file():
+    """最新のJSONLファイルとそのメッセージを取得"""
+    try:
+        if realtime_manager is None:
+            return jsonify({
+                'success': False,
+                'error': 'リアルタイム機能が利用できません'
+            }), 500
+
+        latest_file = realtime_manager.get_latest_file()
+        if not latest_file:
+            return jsonify({
+                'success': False,
+                'error': 'JSONLファイルが見つかりません'
+            }), 404
+
+        # 最新メッセージを取得
+        limit = request.args.get('limit', 30, type=int)
+        messages = realtime_manager.read_file_messages(
+            latest_file['path'], 
+            limit=limit, 
+            latest_only=True
+        )
+
+        return jsonify({
+            'success': True,
+            'file_info': latest_file,
+            'messages': messages,
+            'total': len(messages),
+            'mode': 'realtime'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# ===== WebSocket エンドポイント =====
+
+@socketio.on('connect')
+def handle_connect():
+    """WebSocket接続時の処理"""
+    print(f"WebSocketクライアント接続: {request.sid}")
+    emit('connected', {'status': 'リアルタイム機能が有効です'})
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """WebSocket切断時の処理"""
+    print(f"WebSocketクライアント切断: {request.sid}")
+
+
+@socketio.on('subscribe_file')
+def handle_subscribe_file(data):
+    """特定ファイルの更新通知を購読"""
+    try:
+        file_path = data.get('file_path')
+        print(f"ファイル購読: {file_path} (client: {request.sid})")
+        
+        # TODO: ファイル別購読管理を実装
+        emit('subscribed', {'file_path': file_path, 'status': '購読開始'})
+        
+    except Exception as e:
+        emit('error', {'message': str(e)})
+
+
+@socketio.on('request_latest')
+def handle_request_latest():
+    """最新データのリクエスト"""
+    try:
+        if realtime_manager:
+            latest_file = realtime_manager.get_latest_file()
+            if latest_file:
+                messages = realtime_manager.read_file_messages(
+                    latest_file['path'], 
+                    limit=10, 
+                    latest_only=True
+                )
+                emit('latest_data', {
+                    'file_info': latest_file,
+                    'messages': messages
+                })
+            else:
+                emit('latest_data', {'messages': []})
+        else:
+            emit('error', {'message': 'リアルタイム機能が無効です'})
+            
+    except Exception as e:
+        emit('error', {'message': str(e)})
+
+
 def init_app():
     """アプリケーション初期化"""
     # データベース初期化確認
@@ -528,12 +738,20 @@ if __name__ == '__main__':
     init_app()
 
     # 開発用サーバー起動
-    print("CliLog Viewer 開始中...")
+    print("CliLog Viewer + リアルタイム機能 開始中...")
     print("ブラウザで http://localhost:5000 にアクセスしてください")
+    
+    if realtime_manager:
+        print("リアルタイム機能: 有効")
+        print(f"監視ディレクトリ: {realtime_manager.claude_projects_dir}")
+    else:
+        print("リアルタイム機能: 無効 (依存関係を確認してください)")
 
-    app.run(
+    # SocketIO対応サーバー起動
+    socketio.run(
+        app,
         host='0.0.0.0',
         port=5000,
         debug=True,
-        threaded=True
+        allow_unsafe_werkzeug=True
     )
