@@ -748,11 +748,32 @@ if __name__ == '__main__':
         print("リアルタイム機能: 無効 (依存関係を確認してください)")
 
     # SocketIO対応サーバー起動
-    socketio.run(
-        app,
-        host='0.0.0.0',
-        port=5000,
-        debug=True,
-        use_reloader=False,  # watchdogエラー回避
-        allow_unsafe_werkzeug=True
-    )
+    try:
+        # 新しいバージョンの場合
+        socketio.run(
+            app,
+            host='0.0.0.0',
+            port=5000,
+            debug=False,
+            use_reloader=False,
+            allow_unsafe_werkzeug=True
+        )
+    except TypeError as e:
+        if 'allow_unsafe_werkzeug' in str(e):
+            # 古いバージョンの場合
+            socketio.run(
+                app,
+                host='0.0.0.0',
+                port=5000,
+                debug=False,
+                use_reloader=False
+            )
+        else:
+            # 通常のFlaskサーバーとして起動
+            print("SocketIO起動エラー、通常のFlaskサーバーで起動します")
+            app.run(
+                host='0.0.0.0',
+                port=5000,
+                debug=False,
+                use_reloader=False
+            )
