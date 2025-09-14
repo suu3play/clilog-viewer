@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CliLog Viewer</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/realtime.css">
 </head>
 <body>
     <div id="app">
@@ -13,6 +14,30 @@
             <div class="header-content">
                 <h1 class="title">🤖 CliLog Viewer</h1>
                 <div class="header-controls">
+                    <!-- リアルタイムモード切り替え -->
+                    <div class="mode-selector">
+                        <button id="dbModeBtn" class="mode-btn active" data-mode="database">
+                            💾 データベースモード
+                        </button>
+                        <button id="realtimeModeBtn" class="mode-btn" data-mode="realtime">
+                            ⚡ リアルタイムモード
+                        </button>
+                    </div>
+
+                    <!-- ファイル選択（リアルタイムモード用） -->
+                    <div id="fileSelector" class="file-selector hidden">
+                        <select id="fileDropdown" class="file-dropdown">
+                            <option value="">ファイルを選択...</option>
+                        </select>
+                        <button id="refreshFilesBtn" class="refresh-btn" title="ファイル一覧を更新">
+                            🔄
+                        </button>
+                        <div id="connectionStatus" class="connection-status">
+                            <span class="status-indicator" id="statusIndicator">●</span>
+                            <span id="statusText">未接続</span>
+                        </div>
+                    </div>
+
                     <div class="search-container">
                         <input type="text" id="searchInput" placeholder="メッセージを検索..." class="search-input">
                         <button id="searchBtn" class="search-btn">🔍</button>
@@ -21,7 +46,7 @@
                             <span class="search-loading-text">検索中...</span>
                         </div>
                     </div>
-                    <div class="date-search-container">
+                    <div class="date-search-container" id="dateSearchContainer">
                         <input type="date" id="startDate" class="date-input" title="開始日">
                         <span class="date-separator">-</span>
                         <input type="date" id="endDate" class="date-input" title="終了日">
@@ -123,9 +148,11 @@
     <div id="notifications" class="notifications"></div>
 
     <!-- JavaScript -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     <script src="/static/js/virtual-scroller.js"></script>
     <script src="/static/js/api-client.js"></script>
     <script src="/static/js/ui-manager.js"></script>
+    <script src="/static/js/realtime-client.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
 </html>
