@@ -25,7 +25,7 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# CliLog Viewer specific
+# clilog-viewer specific
 viewer/cache/*.db
 viewer/cache/*.db-*
 *.log

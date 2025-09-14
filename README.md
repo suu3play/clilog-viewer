@@ -1,4 +1,4 @@
-# CliLog Viewer - Multi-AI CLI Log Converter & Viewer
+# clilog-viewer - Multi-AI CLI Log Converter & Viewer
 
 AI CLIツールの会話ログをMarkdownファイルに変換し、高速チャットビューアーで表示するPythonツール
 
