@@ -24,9 +24,7 @@ class UIManager {
         this.bindEvents();
         this.loadTheme();
         this.updateStats();
-        this.setDateRangeRestrictions();
-        console.log('loadAllMessages() を呼び出します');
-        this.loadAllMessages();
+        this.setDateRangeRestrictions(); // この中で直近1週間の表示が実行される
         console.log('UIManager.init() 完了');
     }
 
@@ -642,12 +640,43 @@ class UIManager {
                     this.elements.endDate.min = data.min_date;
                     this.elements.endDate.max = data.max_date;
                 }
+
+                // 初期表示: endDate.maxから直近1週間を設定
+                this.setDefaultDateRange(data.max_date);
+
                 console.log(
                     `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
                 );
             }
         } catch (error) {
             console.warn('日付範囲制限の設定に失敗:', error);
+        }
+    }
+
+    // 直近1週間の日付範囲を設定
+    setDefaultDateRange(maxDate) {
+        try {
+            const endDate = new Date(maxDate);
+            const startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - 6); // 直近1週間（7日間）
+
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = endDate.toISOString().split('T')[0];
+
+            if (this.elements.startDate) {
+                this.elements.startDate.value = startDateStr;
+            }
+            if (this.elements.endDate) {
+                this.elements.endDate.value = endDateStr;
+            }
+
+            console.log(`初期日付範囲設定: ${startDateStr} 〜 ${endDateStr}`);
+
+            // 初期表示で直近1週間のメッセージを表示
+            this.loadMessagesByDateRange(startDateStr, endDateStr);
+
+        } catch (error) {
+            console.warn('初期日付範囲の設定に失敗:', error);
         }
     }
 

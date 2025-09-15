@@ -594,7 +594,7 @@ class RealtimeClient {
         }
     }
 
-    setDefaultDateRange() {
+    async setDefaultDateRange() {
         // 日付入力フィールドの取得
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
@@ -604,23 +604,61 @@ class RealtimeClient {
             return;
         }
 
-        // 今日の日付を取得
-        const today = new Date();
-        // 7日前の日付を計算
-        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        try {
+            // データベースから最大日付を取得
+            const response = await fetch('/api/date-range');
+            const data = await response.json();
 
-        // YYYY-MM-DD形式で日付をフォーマット
-        const endDate = this.formatDateForInput(today);
-        const startDate = this.formatDateForInput(weekAgo);
+            if (data.success && data.max_date) {
+                // endDate.maxから直近1週間を計算
+                const endDate = new Date(data.max_date);
+                const startDate = new Date(endDate);
+                startDate.setDate(startDate.getDate() - 6); // 直近1週間（7日間）
 
-        // 日付フィールドに値を設定
-        startDateInput.value = startDate;
-        endDateInput.value = endDate;
+                // YYYY-MM-DD形式で日付をフォーマット
+                const endDateStr = this.formatDateForInput(endDate);
+                const startDateStr = this.formatDateForInput(startDate);
 
-        console.log(`データベースモード: 日付範囲を自動設定 (${startDate} 〜 ${endDate})`);
+                // 日付フィールドに値を設定
+                startDateInput.value = startDateStr;
+                endDateInput.value = endDateStr;
 
-        // 自動で日付検索を実行
-        this.executeAutoDateSearch(startDate, endDate);
+                console.log(`データベースモード: 日付範囲を自動設定 (${startDateStr} 〜 ${endDateStr})`);
+
+                // 自動で日付検索を実行
+                this.executeAutoDateSearch(startDateStr, endDateStr);
+
+            } else {
+                // フォールバック: 今日から7日前
+                const today = new Date();
+                const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+                const endDateStr = this.formatDateForInput(today);
+                const startDateStr = this.formatDateForInput(weekAgo);
+
+                startDateInput.value = startDateStr;
+                endDateInput.value = endDateStr;
+
+                console.log(`データベースモード: フォールバック日付範囲を設定 (${startDateStr} 〜 ${endDateStr})`);
+                this.executeAutoDateSearch(startDateStr, endDateStr);
+            }
+
+        } catch (error) {
+            console.warn('日付範囲取得エラー、フォールバック処理実行:', error);
+
+            // エラー時のフォールバック: 今日から7日前
+            const today = new Date();
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+            const endDateStr = this.formatDateForInput(today);
+            const startDateStr = this.formatDateForInput(weekAgo);
+
+            startDateInput.value = startDateStr;
+            endDateInput.value = endDateStr;
+
+            console.log(`データベースモード: エラー時フォールバック (${startDateStr} 〜 ${endDateStr})`);
+            this.executeAutoDateSearch(startDateStr, endDateStr);
+        }
     }
 
     executeAutoDateSearch(startDate, endDate) {
