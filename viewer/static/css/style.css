@@ -1353,3 +1353,90 @@ body {
         max-width: calc(100vw - 2rem);
     }
 }
+
+/* ===== ログ変換ボタン ===== */
+.log-converter-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    margin-right: var(--spacing-4);
+}
+
+.log-converter-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-1);
+    padding: var(--spacing-2) var(--spacing-4);
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.log-converter-btn:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.log-converter-btn:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+.log-converter-btn:disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.converter-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.converter-loading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2);
+}
+
+.converter-loading-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--bg-tertiary);
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.converter-loading-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* リアルタイムモード時は非表示 */
+.mode-realtime .log-converter-container {
+    display: none;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .log-converter-container {
+        margin-right: var(--spacing-2);
+    }
+
+    .log-converter-btn {
+        padding: var(--spacing-1) var(--spacing-3);
+        font-size: var(--font-size-xs);
+    }
+}

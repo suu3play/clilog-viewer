@@ -24,9 +24,7 @@ class UIManager {
         this.bindEvents();
         this.loadTheme();
         this.updateStats();
-        this.setDateRangeRestrictions();
-        console.log('loadAllMessages() を呼び出します');
-        this.loadAllMessages();
+        this.setDateRangeRestrictions(); // この中で直近1週間の表示が実行される
         console.log('UIManager.init() 完了');
     }
 
@@ -42,6 +40,10 @@ class UIManager {
             dateSearchBtn: document.getElementById('dateSearchBtn'),
             clearSearchBtn: document.getElementById('clearSearchBtn'),
             fileStatus: document.getElementById('fileStatus'),
+
+            // ログ変換ボタン
+            logConverterBtn: document.getElementById('logConverterBtn'),
+            converterStatus: document.getElementById('converterStatus'),
 
             // サイドバー要素（削除済み）
 
@@ -101,6 +103,13 @@ class UIManager {
         if (this.elements.clearSearchBtn) {
             this.elements.clearSearchBtn.addEventListener('click', () => {
                 this.clearSearchConditions();
+            });
+        }
+
+        // ログ変換ボタン
+        if (this.elements.logConverterBtn) {
+            this.elements.logConverterBtn.addEventListener('click', () => {
+                this.handleLogConversion();
             });
         }
 
@@ -196,6 +205,67 @@ class UIManager {
             this.showNotification(error.message, 'error');
         } finally {
             this.hideLoading();
+        }
+    }
+
+    // ログ変換処理
+    async handleLogConversion() {
+        if (!window.apiClient) {
+            this.showNotification('APIクライアントが利用できません', 'error');
+            return;
+        }
+
+        try {
+            // ボタンを無効化
+            this.elements.logConverterBtn.disabled = true;
+            this.elements.logConverterBtn.textContent = '変換中...';
+
+            // 変換ステータス表示
+            this.showConverterStatus(true);
+
+            // ログ変換API呼び出し
+            const result = await window.apiClient.buildCache();
+
+            if (result.success) {
+                this.showNotification(
+                    `ログ変換が完了しました: ${result.message}`,
+                    'success'
+                );
+
+                // 統計情報を更新
+                this.updateStats();
+
+                // メッセージ表示を更新（データベースモード時）
+                this.loadAllMessages();
+
+            } else {
+                throw new Error(result.error || 'ログ変換に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('Log conversion error:', error);
+            this.showNotification(
+                `ログ変換エラー: ${error.message}`,
+                'error'
+            );
+        } finally {
+            // ボタンを元に戻す
+            this.elements.logConverterBtn.disabled = false;
+            this.elements.logConverterBtn.textContent = '🔄 ログ変換';
+
+            // 変換ステータス非表示
+            this.showConverterStatus(false);
+        }
+    }
+
+    // 変換ステータス表示制御
+    showConverterStatus(show) {
+        if (this.elements.converterStatus) {
+            if (show) {
+                this.elements.converterStatus.classList.remove('hidden');
+            } else {
+                this.elements.converterStatus.classList.add('hidden');
+            }
         }
     }
 
@@ -570,12 +640,43 @@ class UIManager {
                     this.elements.endDate.min = data.min_date;
                     this.elements.endDate.max = data.max_date;
                 }
+
+                // 初期表示: endDate.maxから直近1週間を設定
+                this.setDefaultDateRange(data.max_date);
+
                 console.log(
                     `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
                 );
             }
         } catch (error) {
             console.warn('日付範囲制限の設定に失敗:', error);
+        }
+    }
+
+    // 直近1週間の日付範囲を設定
+    setDefaultDateRange(maxDate) {
+        try {
+            const endDate = new Date(maxDate);
+            const startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - 6); // 直近1週間（7日間）
+
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = endDate.toISOString().split('T')[0];
+
+            if (this.elements.startDate) {
+                this.elements.startDate.value = startDateStr;
+            }
+            if (this.elements.endDate) {
+                this.elements.endDate.value = endDateStr;
+            }
+
+            console.log(`初期日付範囲設定: ${startDateStr} 〜 ${endDateStr}`);
+
+            // 初期表示で直近1週間のメッセージを表示
+            this.loadMessagesByDateRange(startDateStr, endDateStr);
+
+        } catch (error) {
+            console.warn('初期日付範囲の設定に失敗:', error);
         }
     }
 
