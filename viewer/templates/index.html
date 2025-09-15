@@ -59,6 +59,19 @@
                         </div>
                     </div>
 
+                    <!-- ログ変換ボタン（データベースモード専用） -->
+                    <div id="logConverterContainer" class="log-converter-container">
+                        <button id="logConverterBtn" class="log-converter-btn" title="ログファイルをデータベースに変換・更新">
+                            🔄 ログ変換
+                        </button>
+                        <div id="converterStatus" class="converter-status hidden">
+                            <div class="converter-loading">
+                                <div class="converter-loading-spinner"></div>
+                                <span class="converter-loading-text">変換中...</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="search-container">
                         <input type="text" id="searchInput" placeholder="メッセージを検索..." class="search-input">
                         <button id="searchBtn" class="search-btn">🔍</button>

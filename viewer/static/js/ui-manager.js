@@ -43,6 +43,10 @@ class UIManager {
             clearSearchBtn: document.getElementById('clearSearchBtn'),
             fileStatus: document.getElementById('fileStatus'),
 
+            // ログ変換ボタン
+            logConverterBtn: document.getElementById('logConverterBtn'),
+            converterStatus: document.getElementById('converterStatus'),
+
             // サイドバー要素（削除済み）
 
             // メインエリア
@@ -101,6 +105,13 @@ class UIManager {
         if (this.elements.clearSearchBtn) {
             this.elements.clearSearchBtn.addEventListener('click', () => {
                 this.clearSearchConditions();
+            });
+        }
+
+        // ログ変換ボタン
+        if (this.elements.logConverterBtn) {
+            this.elements.logConverterBtn.addEventListener('click', () => {
+                this.handleLogConversion();
             });
         }
 
@@ -196,6 +207,67 @@ class UIManager {
             this.showNotification(error.message, 'error');
         } finally {
             this.hideLoading();
+        }
+    }
+
+    // ログ変換処理
+    async handleLogConversion() {
+        if (!window.apiClient) {
+            this.showNotification('APIクライアントが利用できません', 'error');
+            return;
+        }
+
+        try {
+            // ボタンを無効化
+            this.elements.logConverterBtn.disabled = true;
+            this.elements.logConverterBtn.textContent = '変換中...';
+
+            // 変換ステータス表示
+            this.showConverterStatus(true);
+
+            // ログ変換API呼び出し
+            const result = await window.apiClient.buildCache();
+
+            if (result.success) {
+                this.showNotification(
+                    `ログ変換が完了しました: ${result.message}`,
+                    'success'
+                );
+
+                // 統計情報を更新
+                this.updateStats();
+
+                // メッセージ表示を更新（データベースモード時）
+                this.loadAllMessages();
+
+            } else {
+                throw new Error(result.error || 'ログ変換に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('Log conversion error:', error);
+            this.showNotification(
+                `ログ変換エラー: ${error.message}`,
+                'error'
+            );
+        } finally {
+            // ボタンを元に戻す
+            this.elements.logConverterBtn.disabled = false;
+            this.elements.logConverterBtn.textContent = '🔄 ログ変換';
+
+            // 変換ステータス非表示
+            this.showConverterStatus(false);
+        }
+    }
+
+    // 変換ステータス表示制御
+    showConverterStatus(show) {
+        if (this.elements.converterStatus) {
+            if (show) {
+                this.elements.converterStatus.classList.remove('hidden');
+            } else {
+                this.elements.converterStatus.classList.add('hidden');
+            }
         }
     }
 
