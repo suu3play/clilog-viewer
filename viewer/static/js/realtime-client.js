@@ -135,13 +135,16 @@ class RealtimeClient {
 
     async initializeDatabaseMode() {
         console.log('データベースモード初期化');
-        
+
         // WebSocket切断
         this.disconnectWebSocket();
-        
+
         // 既存のデータベース機能を再有効化
         this.updateStatus('データベースモード', 'success');
-        
+
+        // 直近1週間の日付を自動設定
+        this.setDefaultDateRange();
+
         // 元のUI機能を復元
         if (window.app && typeof window.app.init === 'function') {
             window.app.init();
@@ -589,6 +592,58 @@ class RealtimeClient {
         if (this.elements.loadMoreLoading) {
             this.elements.loadMoreLoading.classList.toggle('hidden', !isLoading);
         }
+    }
+
+    setDefaultDateRange() {
+        // 日付入力フィールドの取得
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+
+        if (!startDateInput || !endDateInput) {
+            console.warn('日付入力フィールドが見つかりません');
+            return;
+        }
+
+        // 今日の日付を取得
+        const today = new Date();
+        // 7日前の日付を計算
+        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        // YYYY-MM-DD形式で日付をフォーマット
+        const endDate = this.formatDateForInput(today);
+        const startDate = this.formatDateForInput(weekAgo);
+
+        // 日付フィールドに値を設定
+        startDateInput.value = startDate;
+        endDateInput.value = endDate;
+
+        console.log(`データベースモード: 日付範囲を自動設定 (${startDate} 〜 ${endDate})`);
+
+        // 自動で日付検索を実行
+        this.executeAutoDateSearch(startDate, endDate);
+    }
+
+    executeAutoDateSearch(startDate, endDate) {
+        // UIManagerの日付検索機能を利用
+        if (window.uiManager && typeof window.uiManager.loadMessagesByDateRange === 'function') {
+            // 少し遅延させてDOM更新を確実にする
+            setTimeout(() => {
+                console.log(`自動日付検索実行: ${startDate} 〜 ${endDate}`);
+                window.uiManager.loadMessagesByDateRange(startDate, endDate);
+                this.showNotification(`直近1週間の会話を読み込みました (${startDate} 〜 ${endDate})`, 'success');
+            }, 100);
+        } else {
+            console.warn('UIManagerの日付検索機能が利用できません');
+            this.showNotification('直近1週間の日付を設定しました', 'info');
+        }
+    }
+
+    formatDateForInput(date) {
+        // 日付をYYYY-MM-DD形式にフォーマット
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 }
 
