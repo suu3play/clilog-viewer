@@ -50,7 +50,7 @@ class JSONLFileReader:
                 'exists': False
             }
     
-    def read_latest_messages(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def read_latest_messages(self, limit: int = 100) -> List[Dict[str, Any]]:
         """最新のメッセージを効率的に読み取り（末尾から）"""
         if not self.file_path.exists():
             return []
@@ -345,7 +345,7 @@ class RealtimeManager:
         files = self.get_available_files()
         return files[0] if files else None
     
-    def read_file_messages(self, file_path: str, limit: int = 50, latest_only: bool = True) -> List[Dict[str, Any]]:
+    def read_file_messages(self, file_path: str, limit: int = 100, latest_only: bool = True) -> List[Dict[str, Any]]:
         """指定ファイルのメッセージを読み取り"""
         reader = self.monitor.get_reader(Path(file_path))
         

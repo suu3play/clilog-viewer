@@ -11,7 +11,10 @@ class RealtimeClient {
         this.selectedFile = null;
         this.autoScroll = true;
         this.files = [];
-        
+        this.currentMessages = [];
+        this.totalAvailableMessages = 0;
+        this.isLoadingMore = false;
+
         this.initializeElements();
         this.bindEvents();
     }
@@ -22,22 +25,29 @@ class RealtimeClient {
             // モード切り替え
             dbModeBtn: document.getElementById('dbModeBtn'),
             realtimeModeBtn: document.getElementById('realtimeModeBtn'),
-            
+
             // ファイル選択
             fileSelector: document.getElementById('fileSelector'),
             fileDropdown: document.getElementById('fileDropdown'),
             refreshFilesBtn: document.getElementById('refreshFilesBtn'),
-            
+
             // 接続ステータス
             connectionStatus: document.getElementById('connectionStatus'),
             statusIndicator: document.getElementById('statusIndicator'),
             statusText: document.getElementById('statusText'),
-            
+
             // 検索・フィルタ
             dateSearchContainer: document.getElementById('dateSearchContainer'),
-            
+
             // メッセージ表示
-            messageArea: document.getElementById('messageArea')
+            messageArea: document.getElementById('messageArea'),
+
+            // もっと読み込み
+            loadMoreContainer: document.getElementById('loadMoreContainer'),
+            loadMoreBtn: document.getElementById('loadMoreBtn'),
+            loadMoreText: document.getElementById('loadMoreText'),
+            loadMoreLoading: document.getElementById('loadMoreLoading'),
+            currentMessageCount: document.getElementById('currentMessageCount')
         };
     }
 
@@ -45,10 +55,13 @@ class RealtimeClient {
         // モード切り替え
         this.elements.dbModeBtn?.addEventListener('click', () => this.switchMode('database'));
         this.elements.realtimeModeBtn?.addEventListener('click', () => this.switchMode('realtime'));
-        
+
         // ファイル操作
         this.elements.fileDropdown?.addEventListener('change', (e) => this.selectFile(e.target.value));
         this.elements.refreshFilesBtn?.addEventListener('click', () => this.refreshFileList());
+
+        // もっと読み込み
+        this.elements.loadMoreBtn?.addEventListener('click', () => this.loadMoreMessages());
     }
 
     switchMode(mode) {
@@ -82,6 +95,7 @@ class RealtimeClient {
         } else {
             this.elements.fileSelector?.classList.add('hidden');
             this.elements.dateSearchContainer?.classList.remove('hidden');
+            this.elements.loadMoreContainer?.classList.add('hidden');
 
             // ポーリング制御を非表示
             const pollingControls = document.getElementById('pollingControls');
@@ -250,7 +264,7 @@ class RealtimeClient {
 
     async loadLatestFile() {
         try {
-            const response = await fetch('/api/realtime/latest?limit=30');
+            const response = await fetch('/api/realtime/latest?limit=100');
             const data = await response.json();
 
             if (data.success && data.file_info) {
@@ -277,7 +291,7 @@ class RealtimeClient {
         this.updateStatus('読み込み中...', 'loading');
 
         try {
-            const response = await fetch(`/api/realtime/messages/${encodeURIComponent(fileName)}?limit=50`);
+            const response = await fetch(`/api/realtime/messages/${encodeURIComponent(fileName)}?limit=100`);
             const data = await response.json();
 
             if (data.success) {
@@ -315,39 +329,54 @@ class RealtimeClient {
                     <p>選択されたファイルにはメッセージが含まれていません。</p>
                 </div>
             `;
+            this.elements.loadMoreContainer?.classList.add('hidden');
             return;
         }
 
-        // メッセージコンテナを作成
-        const container = document.createElement('div');
-        container.className = 'messages-container';
+        // 現在のメッセージリストを更新
+        this.currentMessages = [...messages];
 
-        messages.forEach(msg => {
-            const messageElement = this.createMessageElement(msg);
+        // チャットコンテナを作成（データベースモードと同じ構造）
+        const container = document.createElement('div');
+        container.className = 'chat-container';
+
+        messages.forEach((msg, index) => {
+            const messageElement = this.createMessageElement(msg, index + 1);
             container.appendChild(messageElement);
         });
 
         this.elements.messageArea.appendChild(container);
 
-        // 自動スクロール
-        if (this.autoScroll) {
-            this.scrollToBottom();
-        }
+        // もっと読み込みボタンの表示制御
+        this.updateLoadMoreButton();
+
+        // 自動スクロール（リアルタイムモード初期表示時は強制的に最下部へ）
+        this.scrollToBottom();
     }
 
-    createMessageElement(message) {
+    createMessageElement(message, messageNumber) {
         const div = document.createElement('div');
-        div.className = `message message-${message.role}`;
+        div.className = `chat-message ${message.role}`;
 
         const timestamp = new Date(message.timestamp).toLocaleString('ja-JP');
-        
+        const avatarIcon = message.role === 'user' ? '👤' : '🤖';
+        const roleText = message.role === 'user' ? 'ユーザー' : 'アシスタント';
+
         div.innerHTML = `
-            <div class="message-header">
-                <span class="role">${message.role === 'user' ? 'ユーザー' : 'アシスタント'}</span>
-                <span class="timestamp">${timestamp}</span>
+            <div class="message-avatar">
+                <span class="avatar-icon">${avatarIcon}</span>
             </div>
-            <div class="message-content">
-                ${this.formatMessageContent(message.content)}
+            <div class="message-bubble">
+                <div class="message-header">
+                    <div class="message-info">
+                        <span class="message-number">${messageNumber}</span>
+                        <span class="message-role">${roleText}</span>
+                    </div>
+                    <span class="message-timestamp">${timestamp}</span>
+                </div>
+                <div class="message-content">
+                    ${this.formatMessageContent(message.content)}
+                </div>
             </div>
         `;
 
@@ -381,12 +410,17 @@ class RealtimeClient {
     }
 
     appendMessages(messages) {
-        const container = this.elements.messageArea.querySelector('.messages-container');
+        const container = this.elements.messageArea.querySelector('.chat-container');
         if (!container) return;
 
+        // 現在のメッセージ数を取得して連番を継続
+        const existingMessages = container.querySelectorAll('.chat-message');
+        let messageNumber = existingMessages.length + 1;
+
         messages.forEach(msg => {
-            const messageElement = this.createMessageElement(msg);
+            const messageElement = this.createMessageElement(msg, messageNumber);
             container.appendChild(messageElement);
+            messageNumber++;
         });
 
         // 自動スクロール
@@ -402,14 +436,17 @@ class RealtimeClient {
     }
 
     scrollToBottom() {
-        if (window.ScrollUtils) {
-            window.ScrollUtils.scrollToBottom(this.elements.messageArea);
-        } else {
-            // フォールバック処理
-            if (this.elements.messageArea) {
-                this.elements.messageArea.scrollTop = this.elements.messageArea.scrollHeight;
+        // DOM更新後に確実にスクロールするため、少し待機
+        setTimeout(() => {
+            if (window.ScrollUtils) {
+                window.ScrollUtils.scrollToBottom(this.elements.messageArea);
+            } else {
+                // フォールバック処理
+                if (this.elements.messageArea) {
+                    this.elements.messageArea.scrollTop = this.elements.messageArea.scrollHeight;
+                }
             }
-        }
+        }, 50);
     }
 
     updateStatus(text, type = 'default') {
@@ -455,6 +492,103 @@ class RealtimeClient {
         this.autoScroll = !this.autoScroll;
         console.log(`自動スクロール: ${this.autoScroll ? 'ON' : 'OFF'}`);
         return this.autoScroll;
+    }
+
+    updateLoadMoreButton() {
+        if (!this.elements.loadMoreContainer || this.currentMode !== 'realtime') {
+            return;
+        }
+
+        // 現在のメッセージ数を表示
+        if (this.elements.currentMessageCount) {
+            this.elements.currentMessageCount.textContent = this.currentMessages.length;
+        }
+
+        // 100件以上の場合にボタンを表示
+        if (this.currentMessages.length >= 100) {
+            this.elements.loadMoreContainer.classList.remove('hidden');
+        } else {
+            this.elements.loadMoreContainer.classList.add('hidden');
+        }
+    }
+
+    async loadMoreMessages() {
+        if (!this.selectedFile || this.isLoadingMore) {
+            return;
+        }
+
+        this.isLoadingMore = true;
+        this.setLoadMoreLoading(true);
+
+        try {
+            // より多くのメッセージを取得（200件）
+            const currentLimit = this.currentMessages.length + 100;
+            const response = await fetch(`/api/realtime/messages/${encodeURIComponent(this.selectedFile.name)}?limit=${currentLimit}`);
+            const data = await response.json();
+
+            if (data.success && data.messages.length > this.currentMessages.length) {
+                // 新しく追加されたメッセージのみを追加
+                const newMessages = data.messages.slice(this.currentMessages.length);
+                this.prependMessages(newMessages);
+                this.currentMessages = data.messages;
+
+                console.log(`追加読み込み完了: +${newMessages.length}件 (合計: ${this.currentMessages.length}件)`);
+                this.updateLoadMoreButton();
+                this.showNotification(`${newMessages.length}件のメッセージを追加読み込みしました`, 'info');
+            } else {
+                // これ以上読み込むメッセージがない
+                this.elements.loadMoreContainer?.classList.add('hidden');
+                this.showNotification('これ以上読み込むメッセージがありません', 'info');
+            }
+
+        } catch (error) {
+            console.error('追加読み込みエラー:', error);
+            this.showNotification('メッセージの追加読み込みに失敗しました', 'error');
+        } finally {
+            this.isLoadingMore = false;
+            this.setLoadMoreLoading(false);
+        }
+    }
+
+    prependMessages(messages) {
+        const container = this.elements.messageArea.querySelector('.chat-container');
+        if (!container || !messages.length) return;
+
+        // 現在の最初のメッセージを記録（スクロール位置復元用）
+        const firstMessage = container.querySelector('.chat-message');
+        const scrollContainer = this.elements.messageArea;
+        const oldScrollHeight = scrollContainer.scrollHeight;
+
+        // 新しいメッセージを先頭に追加
+        messages.forEach((msg, index) => {
+            const messageElement = this.createMessageElement(msg, index + 1);
+            container.insertBefore(messageElement, container.firstChild);
+        });
+
+        // 既存のメッセージ番号を更新
+        const allMessages = container.querySelectorAll('.chat-message');
+        allMessages.forEach((msgElement, index) => {
+            const numberElement = msgElement.querySelector('.message-number');
+            if (numberElement) {
+                numberElement.textContent = index + 1;
+            }
+        });
+
+        // スクロール位置を調整（ユーザーの読んでいた位置を維持）
+        const newScrollHeight = scrollContainer.scrollHeight;
+        scrollContainer.scrollTop += (newScrollHeight - oldScrollHeight);
+    }
+
+    setLoadMoreLoading(isLoading) {
+        if (!this.elements.loadMoreBtn) return;
+
+        this.elements.loadMoreBtn.disabled = isLoading;
+        if (this.elements.loadMoreText) {
+            this.elements.loadMoreText.textContent = isLoading ? '読み込み中...' : 'もっと読み込む';
+        }
+        if (this.elements.loadMoreLoading) {
+            this.elements.loadMoreLoading.classList.toggle('hidden', !isLoading);
+        }
     }
 }
 
