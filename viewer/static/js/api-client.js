@@ -127,7 +127,43 @@ class ApiClient {
     }
     
     async getStats() {
-        return await this.request('/stats');
+        const cacheKey = 'stats';
+
+        try {
+            const data = await this.request('/stats');
+            // 成功時のみキャッシュに保存
+            if (data && data.success) {
+                this.cache.set(cacheKey, data);
+            }
+            return data;
+        } catch (error) {
+            console.warn('統計情報取得に失敗:', error.message);
+
+            // キャッシュフォールバック
+            if (this.cache.has(cacheKey)) {
+                console.log('統計情報のキャッシュを使用');
+                const cachedData = this.cache.get(cacheKey);
+                // キャッシュデータに警告フラグを追加
+                return {
+                    ...cachedData,
+                    cached: true,
+                    cache_warning: '最新情報の取得に失敗しました。キャッシュデータを表示しています。'
+                };
+            }
+
+            // キャッシュもない場合はデフォルト値を返す
+            console.warn('統計情報のキャッシュも存在しません。デフォルト値を返します。');
+            return {
+                success: false,
+                error: error.message,
+                stats: {
+                    cached_files: 0,
+                    total_messages: 0,
+                    cache_size_mb: 0,
+                    files: []
+                }
+            };
+        }
     }
     
     clearCache() {
