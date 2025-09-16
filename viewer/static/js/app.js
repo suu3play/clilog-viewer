@@ -8,7 +8,9 @@ class ChatLogApp {
         this.apiClient = window.apiClient;
         this.uiManager = window.uiManager;
         this.virtualScroller = null;
-        
+        this.statsUpdateInProgress = false;
+        this.statsUpdateTimer = null;
+
         this.init();
     }
     
@@ -49,15 +51,51 @@ class ChatLogApp {
     }
     
     async updateStats() {
+        // 重複実行を防止
+        if (this.statsUpdateInProgress) {
+            console.log('統計更新が既に進行中のためスキップ');
+            return;
+        }
+
+        this.statsUpdateInProgress = true;
+
         try {
+            console.log('統計情報更新開始');
             const data = await this.apiClient.getStats();
-            if (data.success) {
+
+            if (data && data.success && data.stats) {
                 const stats = data.stats;
-                this.uiManager.elements.cacheStatus.textContent = 
-                    `キャッシュ: ${stats.cached_files}ファイル (${stats.cache_size_mb.toFixed(1)}MB)`;
+
+                // UI要素が存在する場合のみ更新
+                if (this.uiManager && this.uiManager.elements && this.uiManager.elements.cacheStatus) {
+                    this.uiManager.elements.cacheStatus.textContent =
+                        `キャッシュ: ${stats.cached_files}ファイル (${stats.cache_size_mb.toFixed(1)}MB)`;
+                    console.log(`統計更新成功: ${stats.cached_files}ファイル, ${stats.total_messages}メッセージ`);
+                } else {
+                    console.warn('UI要素が見つからないため統計表示をスキップ');
+                }
+            } else {
+                console.warn('統計情報の取得に失敗または無効なレスポンス:', data);
+
+                // エラー時はUI表示も更新
+                if (this.uiManager && this.uiManager.elements && this.uiManager.elements.cacheStatus) {
+                    this.uiManager.elements.cacheStatus.textContent = 'キャッシュ: 取得失敗';
+                }
             }
         } catch (error) {
-            console.warn('統計情報取得エラー:', error);
+            console.error('統計情報取得エラー:', error);
+
+            // エラー表示をUIに反映
+            if (this.uiManager && this.uiManager.elements && this.uiManager.elements.cacheStatus) {
+                this.uiManager.elements.cacheStatus.textContent = 'キャッシュ: エラー';
+            }
+
+            // 通知がある場合は表示
+            if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                this.uiManager.showNotification('統計情報の取得に失敗しました', 'warning');
+            }
+        } finally {
+            this.statsUpdateInProgress = false;
         }
     }
     
@@ -70,10 +108,26 @@ class ChatLogApp {
     }
     
     startStatsUpdateTimer() {
+        // 既存のタイマーがあればクリア
+        if (this.statsUpdateTimer) {
+            clearInterval(this.statsUpdateTimer);
+        }
+
         // 30秒ごとに統計更新
-        setInterval(() => {
+        this.statsUpdateTimer = setInterval(() => {
+            console.log('定期統計更新実行');
             this.updateStats();
         }, 30000);
+
+        console.log('統計更新タイマー開始（30秒間隔）');
+    }
+
+    stopStatsUpdateTimer() {
+        if (this.statsUpdateTimer) {
+            clearInterval(this.statsUpdateTimer);
+            this.statsUpdateTimer = null;
+            console.log('統計更新タイマー停止');
+        }
     }
     
     // エラー処理

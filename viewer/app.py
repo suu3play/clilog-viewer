@@ -461,43 +461,109 @@ def get_stats():
     """統計情報を取得（データベースから）"""
     try:
         if database is None:
+            print("エラー: データベースが利用できません")
             return jsonify({
                 'success': False,
                 'error': 'データベースが利用できません'
             }), 500
 
+        # データベースファイルの存在確認
+        if not database.db_path.exists():
+            print(f"エラー: データベースファイルが存在しません: {database.db_path}")
+            return jsonify({
+                'success': False,
+                'error': 'データベースファイルが存在しません'
+            }), 500
+
         import sqlite3
-        with sqlite3.connect(database.db_path) as conn:
-            conn.row_factory = sqlite3.Row
 
-            # ファイル数を取得
-            cursor = conn.execute('SELECT COUNT(*) as file_count FROM log_files')
-            file_count = cursor.fetchone()['file_count']
+        # デフォルト値を設定
+        file_count = 0
+        message_count = 0
+        recent_files = []
+        cache_size_mb = 0
 
-            # メッセージ数を取得
-            cursor = conn.execute('SELECT COUNT(*) as message_count FROM conversations')
-            message_count = cursor.fetchone()['message_count']
+        try:
+            with sqlite3.connect(database.db_path, timeout=10.0) as conn:
+                conn.row_factory = sqlite3.Row
 
-            # 最新ファイル情報を取得（シンプル版）
-            cursor = conn.execute('''
-                SELECT filename, last_modified
-                FROM log_files
-                ORDER BY last_modified DESC
-                LIMIT 10
-            ''')
-            recent_files = []
-            for row in cursor.fetchall():
-                recent_files.append({
-                    'filename': row['filename'],
-                    'last_modified': row['last_modified']
-                })
+                # メッセージ数を取得（必須テーブル）
+                try:
+                    cursor = conn.execute('SELECT COUNT(*) as message_count FROM conversations')
+                    message_count = cursor.fetchone()['message_count']
+                except sqlite3.Error as e:
+                    print(f"警告: conversationsテーブルからの取得に失敗: {e}")
+                    message_count = 0
+
+                # ファイル数を取得（log_filesテーブルが存在しない場合もあり得る）
+                try:
+                    cursor = conn.execute('SELECT COUNT(*) as file_count FROM log_files')
+                    file_count = cursor.fetchone()['file_count']
+                except sqlite3.Error as e:
+                    print(f"警告: log_filesテーブルからの取得に失敗: {e}")
+                    # conversationsテーブルからユニークなファイル名数を取得
+                    try:
+                        cursor = conn.execute('SELECT COUNT(DISTINCT filename) as file_count FROM conversations')
+                        file_count = cursor.fetchone()['file_count']
+                    except sqlite3.Error as e2:
+                        print(f"警告: conversationsテーブルからのファイル数取得も失敗: {e2}")
+                        file_count = 0
+
+                # 最新ファイル情報を取得
+                try:
+                    cursor = conn.execute('''
+                        SELECT filename, last_modified
+                        FROM log_files
+                        ORDER BY last_modified DESC
+                        LIMIT 10
+                    ''')
+                    for row in cursor.fetchall():
+                        recent_files.append({
+                            'filename': row['filename'],
+                            'last_modified': row['last_modified']
+                        })
+                except sqlite3.Error as e:
+                    print(f"警告: 最新ファイル情報の取得に失敗: {e}")
+                    # conversationsテーブルから代替取得を試行
+                    try:
+                        cursor = conn.execute('''
+                            SELECT filename, MAX(timestamp) as last_modified
+                            FROM conversations
+                            GROUP BY filename
+                            ORDER BY MAX(timestamp) DESC
+                            LIMIT 10
+                        ''')
+                        for row in cursor.fetchall():
+                            recent_files.append({
+                                'filename': row['filename'],
+                                'last_modified': row['last_modified']
+                            })
+                    except sqlite3.Error as e2:
+                        print(f"警告: 代替ファイル情報の取得も失敗: {e2}")
+                        recent_files = []
+
+        except sqlite3.Error as db_error:
+            print(f"データベース接続エラー: {db_error}")
+            return jsonify({
+                'success': False,
+                'error': f'データベース接続エラー: {str(db_error)}'
+            }), 500
+
+        # ファイルサイズを安全に取得
+        try:
+            cache_size_mb = database.db_path.stat().st_size / (1024 * 1024)
+        except (OSError, AttributeError) as e:
+            print(f"警告: ファイルサイズの取得に失敗: {e}")
+            cache_size_mb = 0
 
         stats = {
             'cached_files': file_count,
             'total_messages': message_count,
-            'cache_size_mb': database.db_path.stat().st_size / (1024 * 1024) if database.db_path.exists() else 0,
+            'cache_size_mb': round(cache_size_mb, 2),
             'files': recent_files
         }
+
+        print(f"統計情報取得成功: ファイル数={file_count}, メッセージ数={message_count}, キャッシュサイズ={cache_size_mb:.2f}MB")
 
         return jsonify({
             'success': True,
@@ -505,9 +571,12 @@ def get_stats():
         })
 
     except Exception as e:
+        print(f"統計情報取得で予期しないエラー: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': f'統計情報の取得に失敗しました: {str(e)}'
         }), 500
 
 
