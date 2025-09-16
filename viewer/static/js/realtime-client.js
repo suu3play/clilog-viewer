@@ -350,6 +350,11 @@ class RealtimeClient {
 
         this.elements.messageArea.appendChild(container);
 
+        // コピーボタンのイベントリスナーを追加
+        if (window.CopyUtils) {
+            window.CopyUtils.attachCopyListeners(container);
+        }
+
         // もっと読み込みボタンの表示制御
         this.updateLoadMoreButton();
 
@@ -376,6 +381,11 @@ class RealtimeClient {
                         <span class="message-role">${roleText}</span>
                     </div>
                     <span class="message-timestamp">${timestamp}</span>
+                    <button class="copy-button"
+                            data-message-index="${messageNumber}"
+                            title="クリップボードにコピー"
+                            aria-label="このメッセージをクリップボードにコピーします"
+                            tabindex="0">コピー</button>
                 </div>
                 <div class="message-content">
                     ${this.formatMessageContent(message.content)}
@@ -423,6 +433,12 @@ class RealtimeClient {
         messages.forEach(msg => {
             const messageElement = this.createMessageElement(msg, messageNumber);
             container.appendChild(messageElement);
+
+            // 新しいメッセージにコピーボタンのイベントリスナーを追加
+            if (window.CopyUtils) {
+                window.CopyUtils.attachCopyListeners(messageElement);
+            }
+
             messageNumber++;
         });
 

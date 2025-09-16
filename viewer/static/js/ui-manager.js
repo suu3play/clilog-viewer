@@ -325,6 +325,11 @@ class UIManager {
                             <span class="message-role">${roleName}</span>
                         </span>
                         <span class="message-timestamp">${timestamp}</span>
+                        <button class="copy-button"
+                                data-message-index="${index}"
+                                title="クリップボードにコピー"
+                                aria-label="このメッセージをクリップボードにコピーします"
+                                tabindex="0">コピー</button>
                     </div>
                     <div class="message-content">${this.formatMessageContent(
                         message.content
@@ -336,6 +341,11 @@ class UIManager {
         });
 
         this.elements.messageArea.appendChild(chatContainer);
+
+        // コピーボタンのイベントリスナーを追加
+        if (window.CopyUtils) {
+            window.CopyUtils.attachCopyListeners(chatContainer);
+        }
 
         // 最後のメッセージまでスクロール（確実にDOM更新後に実行）
         this.scrollToBottom();

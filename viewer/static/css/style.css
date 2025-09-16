@@ -1429,6 +1429,106 @@ body {
     display: none;
 }
 
+/* ===== コピーボタンスタイル ===== */
+
+.copy-button {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: var(--spacing-1);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    margin-left: var(--spacing-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 24px;
+    opacity: 0;
+    transform: scale(0.9);
+}
+
+.copy-button:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+    transform: scale(1);
+    opacity: 1;
+}
+
+.copy-button:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    opacity: 1;
+}
+
+.copy-button:active {
+    transform: scale(0.95);
+}
+
+/* ホバー時にコピーボタンを表示 */
+.chat-message:hover .copy-button,
+.chat-message:focus-within .copy-button {
+    opacity: 0.7;
+}
+
+.chat-message:hover .copy-button:hover,
+.copy-button:focus {
+    opacity: 1;
+}
+
+/* コピー成功・失敗フィードバック */
+.copy-button.copy-success {
+    color: var(--success, #22c55e);
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.copy-button.copy-error {
+    color: var(--error, #ef4444);
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* メッセージヘッダー内でのレイアウト調整 */
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.message-header .copy-button {
+    margin-left: auto;
+    margin-right: var(--spacing-1);
+}
+
+/* タッチデバイス対応 */
+@media (hover: none) and (pointer: coarse) {
+    .copy-button {
+        opacity: 0.6;
+        min-width: 32px;
+        min-height: 32px;
+        font-size: 1.1rem;
+    }
+
+    .copy-button:active {
+        opacity: 1;
+        background-color: var(--bg-hover);
+    }
+}
+
+/* ダークテーマ対応 */
+[data-theme="dark"] .copy-button {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .copy-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
     .log-converter-container {
@@ -1438,5 +1538,12 @@ body {
     .log-converter-btn {
         padding: var(--spacing-1) var(--spacing-3);
         font-size: var(--font-size-xs);
+    }
+
+    /* モバイルでコピーボタンを少し大きく */
+    .copy-button {
+        min-width: 28px;
+        min-height: 28px;
+        font-size: 1.05rem;
     }
 }
