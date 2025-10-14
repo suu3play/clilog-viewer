@@ -112,9 +112,7 @@ body {
     align-items: center;
     min-height: var(--header-height);
     padding: var(--spacing-2) var(--spacing-4);
-    max-width: 1400px;
     width: 100%;
-    margin: 0 auto;
     gap: var(--spacing-4);
 }
 
