@@ -97,7 +97,6 @@ body {
 
 /* ===== ヘッダー ===== */
 .header {
-    min-height: var(--header-height);
     background-color: var(--bg-color);
     border-bottom: 1px solid var(--border-color);
     box-shadow: var(--shadow-sm);
@@ -110,7 +109,7 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    height: 100%;
+    min-height: var(--header-height);
     padding: var(--spacing-2) var(--spacing-4);
     max-width: 100%;
     gap: var(--spacing-2);
@@ -291,8 +290,8 @@ body {
 .main {
     display: flex;
     flex: 1;
-    height: calc(100vh - var(--header-height) - var(--footer-height));
     overflow: hidden;
+    min-height: 0;
 }
 
 /* ===== サイドバー（削除済み） ===== */
