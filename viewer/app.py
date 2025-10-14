@@ -95,6 +95,44 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/api/config')
+def get_config():
+    """アプリケーション設定を取得"""
+    try:
+        config_file = Path(__file__).parent.parent / 'log_converter_config.ini'
+        default_display_mode = 'database'  # デフォルト値
+
+        if config_file.exists() and Config:
+            try:
+                import configparser
+                config_parser = configparser.ConfigParser()
+                config_parser.read(config_file, encoding='utf-8')
+
+                # 設定ファイルからモードを取得
+                if 'DEFAULT' in config_parser and 'default_display_mode' in config_parser['DEFAULT']:
+                    mode_value = config_parser['DEFAULT']['default_display_mode'].strip().lower()
+                    if mode_value in ['realtime', 'database']:
+                        default_display_mode = mode_value
+            except Exception as e:
+                print(f"設定ファイル読み込みエラー: {e}")
+
+        return jsonify({
+            'success': True,
+            'config': {
+                'default_display_mode': default_display_mode
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'config': {
+                'default_display_mode': 'database'  # エラー時もデフォルト値を返す
+            }
+        })
+
+
 @app.route('/api/files')
 def get_files():
     """利用可能ファイル一覧を取得（データベースから）"""

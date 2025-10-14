@@ -16,7 +16,7 @@
                 <div class="header-controls">
                     <!-- リアルタイムモード切り替え -->
                     <div class="mode-selector">
-                        <button id="dbModeBtn" class="mode-btn active" data-mode="database">
+                        <button id="dbModeBtn" class="mode-btn" data-mode="database">
                             💾 データベースモード
                         </button>
                         <button id="realtimeModeBtn" class="mode-btn" data-mode="realtime">
@@ -24,18 +24,10 @@
                         </button>
                     </div>
 
-                    <!-- ファイル選択（リアルタイムモード用） -->
-                    <div id="fileSelector" class="file-selector hidden">
-                        <select id="fileDropdown" class="file-dropdown">
-                            <option value="">ファイルを選択...</option>
-                        </select>
-                        <button id="refreshFilesBtn" class="refresh-btn" title="ファイル一覧を更新">
-                            🔄
-                        </button>
-                        <div id="connectionStatus" class="connection-status">
-                            <span class="status-indicator" id="statusIndicator">●</span>
-                            <span id="statusText">未接続</span>
-                        </div>
+                    <!-- リアルタイムモード接続ステータス -->
+                    <div id="connectionStatus" class="connection-status hidden">
+                        <span class="status-indicator" id="statusIndicator">●</span>
+                        <span id="statusText">未接続</span>
                     </div>
 
                     <!-- ポーリング制御（リアルタイムモード用） -->

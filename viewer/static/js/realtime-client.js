@@ -26,11 +26,6 @@ class RealtimeClient {
             dbModeBtn: document.getElementById('dbModeBtn'),
             realtimeModeBtn: document.getElementById('realtimeModeBtn'),
 
-            // ファイル選択
-            fileSelector: document.getElementById('fileSelector'),
-            fileDropdown: document.getElementById('fileDropdown'),
-            refreshFilesBtn: document.getElementById('refreshFilesBtn'),
-
             // 接続ステータス
             connectionStatus: document.getElementById('connectionStatus'),
             statusIndicator: document.getElementById('statusIndicator'),
@@ -56,10 +51,6 @@ class RealtimeClient {
         this.elements.dbModeBtn?.addEventListener('click', () => this.switchMode('database'));
         this.elements.realtimeModeBtn?.addEventListener('click', () => this.switchMode('realtime'));
 
-        // ファイル操作
-        this.elements.fileDropdown?.addEventListener('change', (e) => this.selectFile(e.target.value));
-        this.elements.refreshFilesBtn?.addEventListener('click', () => this.refreshFileList());
-
         // もっと読み込み
         this.elements.loadMoreBtn?.addEventListener('click', () => this.loadMoreMessages());
     }
@@ -83,17 +74,17 @@ class RealtimeClient {
         // ボタンのアクティブ状態
         this.elements.dbModeBtn?.classList.toggle('active', this.currentMode === 'database');
         this.elements.realtimeModeBtn?.classList.toggle('active', this.currentMode === 'realtime');
-        
+
         // UI要素の表示/非表示
         if (this.currentMode === 'realtime') {
-            this.elements.fileSelector?.classList.remove('hidden');
+            this.elements.connectionStatus?.classList.remove('hidden');
             this.elements.dateSearchContainer?.classList.add('hidden');
 
             // ポーリング制御も表示
             const pollingControls = document.getElementById('pollingControls');
             pollingControls?.classList.remove('hidden');
         } else {
-            this.elements.fileSelector?.classList.add('hidden');
+            this.elements.connectionStatus?.classList.add('hidden');
             this.elements.dateSearchContainer?.classList.remove('hidden');
             this.elements.loadMoreContainer?.classList.add('hidden');
 
@@ -108,24 +99,21 @@ class RealtimeClient {
                 if (pollingToggle) pollingToggle.checked = false;
             }
         }
-        
+
         // メッセージエリアをクリア
         this.clearMessages();
     }
 
     async initializeRealtimeMode() {
         console.log('リアルタイムモード初期化開始');
-        
+
         try {
             // WebSocket接続
             await this.connectWebSocket();
-            
-            // ファイル一覧取得
-            await this.refreshFileList();
-            
+
             // 最新ファイルを自動選択
             await this.loadLatestFile();
-            
+
         } catch (error) {
             console.error('リアルタイムモード初期化エラー:', error);
             this.updateStatus('エラー', 'error');
@@ -145,9 +133,9 @@ class RealtimeClient {
         // 直近1週間の日付を自動設定
         this.setDefaultDateRange();
 
-        // 元のUI機能を復元
-        if (window.app && typeof window.app.init === 'function') {
-            window.app.init();
+        // loadInitialDataのみを呼び出す（init()を呼び出さない）
+        if (window.app && typeof window.app.loadInitialData === 'function') {
+            await window.app.loadInitialData();
         }
     }
 
@@ -225,46 +213,6 @@ class RealtimeClient {
         }
     }
 
-    async refreshFileList() {
-        console.log('ファイル一覧更新中...');
-        this.updateStatus('読み込み中...', 'loading');
-
-        try {
-            const response = await fetch('/api/realtime/files');
-            const data = await response.json();
-
-            if (data.success) {
-                this.files = data.files;
-                this.populateFileDropdown();
-                this.updateStatus(`${data.files.length}件のファイル`, 'success');
-                console.log(`${data.files.length}件のファイルを取得`);
-            } else {
-                throw new Error(data.error || 'ファイル一覧の取得に失敗');
-            }
-
-        } catch (error) {
-            console.error('ファイル一覧取得エラー:', error);
-            this.updateStatus('ファイル取得エラー', 'error');
-            this.showNotification('ファイル一覧の取得に失敗しました', 'error');
-        }
-    }
-
-    populateFileDropdown() {
-        if (!this.elements.fileDropdown) return;
-
-        // ドロップダウンをクリア
-        this.elements.fileDropdown.innerHTML = '<option value="">ファイルを選択...</option>';
-
-        // ファイルオプションを追加
-        this.files.forEach(file => {
-            const option = document.createElement('option');
-            option.value = file.name;
-            option.textContent = `${file.name} (${this.formatFileSize(file.size)})`;
-            option.title = file.display_path || file.path;
-            this.elements.fileDropdown.appendChild(option);
-        });
-    }
-
     async loadLatestFile() {
         try {
             const response = await fetch('/api/realtime/latest?limit=100');
@@ -272,9 +220,8 @@ class RealtimeClient {
 
             if (data.success && data.file_info) {
                 this.selectedFile = data.file_info;
-                this.elements.fileDropdown.value = data.file_info.name;
                 this.displayMessages(data.messages);
-                
+
                 console.log(`最新ファイル読み込み完了: ${data.file_info.name} (${data.messages.length}件)`);
                 this.updateStatus(`最新: ${data.file_info.name}`, 'success');
             } else {
@@ -284,38 +231,6 @@ class RealtimeClient {
         } catch (error) {
             console.error('最新ファイル読み込みエラー:', error);
             this.showNotification('最新ファイルの読み込みに失敗しました', 'error');
-        }
-    }
-
-    async selectFile(fileName) {
-        if (!fileName) return;
-
-        console.log(`ファイル選択: ${fileName}`);
-        this.updateStatus('読み込み中...', 'loading');
-
-        try {
-            const response = await fetch(`/api/realtime/messages/${encodeURIComponent(fileName)}?limit=100`);
-            const data = await response.json();
-
-            if (data.success) {
-                this.selectedFile = data.file_info;
-                this.displayMessages(data.messages);
-                
-                console.log(`ファイル読み込み完了: ${fileName} (${data.messages.length}件)`);
-                this.updateStatus(`読み込み完了: ${fileName}`, 'success');
-                
-                // WebSocketでファイル購読
-                if (this.socket && this.isConnected) {
-                    this.socket.emit('subscribe_file', { file_path: this.selectedFile.path });
-                }
-            } else {
-                throw new Error(data.error || 'ファイルの読み込みに失敗');
-            }
-
-        } catch (error) {
-            console.error('ファイル読み込みエラー:', error);
-            this.updateStatus('読み込みエラー', 'error');
-            this.showNotification(`ファイル読み込みに失敗: ${error.message}`, 'error');
         }
     }
 

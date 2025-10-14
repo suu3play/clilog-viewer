@@ -408,50 +408,82 @@ class PollingClient {
             return;
         }
 
-        // メッセージコンテナを作成
+        // メッセージコンテナを作成（chat-containerに統一）
         const container = document.createElement('div');
-        container.className = 'messages-container';
+        container.className = 'chat-container';
 
-        messages.forEach(msg => {
-            const messageElement = this.createMessageElement(msg);
+        messages.forEach((msg, index) => {
+            const messageElement = this.createMessageElement(msg, index + 1);
             container.appendChild(messageElement);
         });
 
         this.elements.messageArea.appendChild(container);
+
+        // コピーボタンのイベントリスナーを追加
+        if (window.CopyUtils) {
+            window.CopyUtils.attachCopyListeners(container);
+        }
+
         this.scrollToBottom();
     }
 
     appendMessages(messages) {
         if (!this.elements.messageArea || !messages || messages.length === 0) return;
 
-        let container = this.elements.messageArea.querySelector('.messages-container');
+        let container = this.elements.messageArea.querySelector('.chat-container');
         if (!container) {
             // コンテナが存在しない場合は新規作成
             this.displayMessages(messages);
             return;
         }
 
+        // 現在のメッセージ数を取得して連番を継続
+        const existingMessages = container.querySelectorAll('.chat-message');
+        let messageNumber = existingMessages.length + 1;
+
         messages.forEach(msg => {
-            const messageElement = this.createMessageElement(msg);
+            const messageElement = this.createMessageElement(msg, messageNumber);
             container.appendChild(messageElement);
+
+            // 新しいメッセージにコピーボタンのイベントリスナーを追加
+            if (window.CopyUtils) {
+                window.CopyUtils.attachCopyListeners(messageElement);
+            }
+
+            messageNumber++;
         });
 
         this.scrollToBottom();
     }
 
-    createMessageElement(message) {
+    createMessageElement(message, messageNumber) {
         const div = document.createElement('div');
-        div.className = `message message-${message.role}`;
+        div.className = `chat-message ${message.role}`;
 
         const timestamp = new Date(message.timestamp).toLocaleString('ja-JP');
+        const avatarIcon = message.role === 'user' ? '👤' : '🤖';
+        const roleText = message.role === 'user' ? 'ユーザー' : 'アシスタント';
 
         div.innerHTML = `
-            <div class="message-header">
-                <span class="role">${message.role === 'user' ? 'ユーザー' : 'アシスタント'}</span>
-                <span class="timestamp">${timestamp}</span>
+            <div class="message-avatar">
+                <span class="avatar-icon">${avatarIcon}</span>
             </div>
-            <div class="message-content">
-                ${this.formatMessageContent(message.content)}
+            <div class="message-bubble">
+                <div class="message-header">
+                    <div class="message-info">
+                        <span class="message-number">${messageNumber}</span>
+                        <span class="message-role">${roleText}</span>
+                    </div>
+                    <span class="message-timestamp">${timestamp}</span>
+                    <button class="copy-button"
+                            data-message-index="${messageNumber}"
+                            title="クリップボードにコピー"
+                            aria-label="このメッセージをクリップボードにコピーします"
+                            tabindex="0">コピー</button>
+                </div>
+                <div class="message-content">
+                    ${this.formatMessageContent(message.content)}
+                </div>
             </div>
         `;
 
