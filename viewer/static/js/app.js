@@ -10,6 +10,7 @@ class ChatLogApp {
         this.virtualScroller = null;
         this.statsUpdateInProgress = false;
         this.statsUpdateTimer = null;
+        this.isInitialized = false;  // 初回初期化フラグ
 
         this.init();
     }
@@ -28,8 +29,11 @@ class ChatLogApp {
                 }
             });
 
-            // 設定を読み込んで初期表示モードを決定
-            await this.loadConfigAndInitializeMode();
+            // 設定を読み込んで初期表示モードを決定（初回のみ）
+            if (!this.isInitialized) {
+                await this.loadConfigAndInitializeMode();
+                this.isInitialized = true;
+            }
 
             // 初期データ読み込み
             await this.loadInitialData();

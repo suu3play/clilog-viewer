@@ -145,9 +145,9 @@ class RealtimeClient {
         // 直近1週間の日付を自動設定
         this.setDefaultDateRange();
 
-        // 元のUI機能を復元
-        if (window.app && typeof window.app.init === 'function') {
-            window.app.init();
+        // loadInitialDataのみを呼び出す（init()を呼び出さない）
+        if (window.app && typeof window.app.loadInitialData === 'function') {
+            await window.app.loadInitialData();
         }
     }
 
