@@ -50,7 +50,7 @@
     --spacing-6: 1.5rem;
     --spacing-8: 2rem;
 
-    --header-height: 6rem;
+    --header-height: 4.5rem;
     --sidebar-width: 320px;
     --footer-height: 3rem;
 }
@@ -107,15 +107,15 @@ body {
 
 .header-content {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
+    flex-direction: row;
+    justify-content: space-between;
     align-items: center;
     min-height: var(--header-height);
     padding: var(--spacing-2) var(--spacing-4);
     max-width: 1400px;
     width: 100%;
     margin: 0 auto;
-    gap: var(--spacing-2);
+    gap: var(--spacing-4);
 }
 
 .title {
@@ -123,21 +123,29 @@ body {
     font-weight: 700;
     color: var(--primary-color);
     margin: 0;
+    flex-shrink: 0;
 }
 
 .header-controls {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: var(--spacing-4);
-    flex-wrap: wrap;
-    width: 100%;
+    gap: var(--spacing-3);
+    flex-wrap: nowrap;
+    flex: 1;
+    justify-content: flex-end;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.header-controls::-webkit-scrollbar {
+    display: none;
 }
 
 .search-container {
     display: flex;
     align-items: center;
     position: relative;
+    flex-shrink: 0;
 }
 
 .search-loading {
@@ -222,6 +230,7 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
+    flex-shrink: 0;
 }
 
 .date-input {
@@ -1365,7 +1374,7 @@ body {
     display: flex;
     align-items: center;
     gap: var(--spacing-2);
-    margin-right: var(--spacing-4);
+    flex-shrink: 0;
 }
 
 .log-converter-btn {
