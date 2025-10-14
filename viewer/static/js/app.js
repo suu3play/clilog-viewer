@@ -16,7 +16,7 @@ class ChatLogApp {
     
     async init() {
         console.log('CliLog Viewer 起動中...');
-        
+
         try {
             // API進捗表示を設定
             this.apiClient.onProgress(({ message, percent }) => {
@@ -27,18 +27,49 @@ class ChatLogApp {
                     this.updateProgressBar(percent);
                 }
             });
-            
+
+            // 設定を読み込んで初期表示モードを決定
+            await this.loadConfigAndInitializeMode();
+
             // 初期データ読み込み
             await this.loadInitialData();
-            
+
             // 定期的な統計更新
             this.startStatsUpdateTimer();
-            
+
             console.log('アプリケーション初期化完了');
-            
+
         } catch (error) {
             console.error('アプリケーション初期化エラー:', error);
             this.uiManager.showNotification('アプリケーションの初期化に失敗しました', 'error');
+        }
+    }
+
+    async loadConfigAndInitializeMode() {
+        try {
+            const response = await fetch('/api/config');
+            const data = await response.json();
+
+            if (data.success && data.config) {
+                const defaultMode = data.config.default_display_mode || 'database';
+                console.log(`設定から初期表示モード取得: ${defaultMode}`);
+
+                // リアルタイムクライアントが存在する場合、初期モードを設定
+                if (window.realtimeClient) {
+                    window.realtimeClient.switchMode(defaultMode);
+                }
+            } else {
+                console.warn('設定の取得に失敗、デフォルトモード(database)を使用');
+                if (window.realtimeClient) {
+                    window.realtimeClient.switchMode('database');
+                }
+            }
+        } catch (error) {
+            console.error('設定読み込みエラー:', error);
+            // エラー時はデフォルトモード(database)を使用
+            if (window.realtimeClient) {
+                window.realtimeClient.switchMode('database');
+            }
         }
     }
     
