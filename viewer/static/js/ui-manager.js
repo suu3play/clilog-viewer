@@ -651,8 +651,8 @@ class UIManager {
                     this.elements.endDate.max = data.max_date;
                 }
 
-                // 初期表示: endDate.maxから直近1週間を設定
-                this.setDefaultDateRange(data.max_date);
+                // 初期表示: 全ログを読み込む
+                this.loadAllMessages();
 
                 console.log(
                     `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
