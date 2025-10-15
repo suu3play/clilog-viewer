@@ -75,6 +75,9 @@ class RealtimeClient {
         this.elements.dbModeBtn?.classList.toggle('active', this.currentMode === 'database');
         this.elements.realtimeModeBtn?.classList.toggle('active', this.currentMode === 'realtime');
 
+        // ログ変換ボタンの表示制御
+        const logConverterContainer = document.getElementById('logConverterContainer');
+
         // UI要素の表示/非表示
         if (this.currentMode === 'realtime') {
             this.elements.connectionStatus?.classList.remove('hidden');
@@ -83,6 +86,9 @@ class RealtimeClient {
             // ポーリング制御も表示
             const pollingControls = document.getElementById('pollingControls');
             pollingControls?.classList.remove('hidden');
+
+            // ログ変換ボタンを非表示
+            logConverterContainer?.classList.add('hidden');
         } else {
             this.elements.connectionStatus?.classList.add('hidden');
             this.elements.dateSearchContainer?.classList.remove('hidden');
@@ -98,6 +104,9 @@ class RealtimeClient {
                 const pollingToggle = document.getElementById('pollingToggle');
                 if (pollingToggle) pollingToggle.checked = false;
             }
+
+            // ログ変換ボタンを表示
+            logConverterContainer?.classList.remove('hidden');
         }
 
         // メッセージエリアをクリア
@@ -526,69 +535,12 @@ class RealtimeClient {
     }
 
     async setDefaultDateRange() {
-        // 日付入力フィールドの取得
-        const startDateInput = document.getElementById('startDate');
-        const endDateInput = document.getElementById('endDate');
-
-        if (!startDateInput || !endDateInput) {
-            console.warn('日付入力フィールドが見つかりません');
-            return;
-        }
-
-        try {
-            // データベースから最大日付を取得
-            const response = await fetch('/api/date-range');
-            const data = await response.json();
-
-            if (data.success && data.max_date) {
-                // endDate.maxから直近1週間を計算
-                const endDate = new Date(data.max_date);
-                const startDate = new Date(endDate);
-                startDate.setDate(startDate.getDate() - 6); // 直近1週間（7日間）
-
-                // YYYY-MM-DD形式で日付をフォーマット
-                const endDateStr = this.formatDateForInput(endDate);
-                const startDateStr = this.formatDateForInput(startDate);
-
-                // 日付フィールドに値を設定
-                startDateInput.value = startDateStr;
-                endDateInput.value = endDateStr;
-
-                console.log(`データベースモード: 日付範囲を自動設定 (${startDateStr} 〜 ${endDateStr})`);
-
-                // 自動で日付検索を実行
-                this.executeAutoDateSearch(startDateStr, endDateStr);
-
-            } else {
-                // フォールバック: 今日から7日前
-                const today = new Date();
-                const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-                const endDateStr = this.formatDateForInput(today);
-                const startDateStr = this.formatDateForInput(weekAgo);
-
-                startDateInput.value = startDateStr;
-                endDateInput.value = endDateStr;
-
-                console.log(`データベースモード: フォールバック日付範囲を設定 (${startDateStr} 〜 ${endDateStr})`);
-                this.executeAutoDateSearch(startDateStr, endDateStr);
-            }
-
-        } catch (error) {
-            console.warn('日付範囲取得エラー、フォールバック処理実行:', error);
-
-            // エラー時のフォールバック: 今日から7日前
-            const today = new Date();
-            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-            const endDateStr = this.formatDateForInput(today);
-            const startDateStr = this.formatDateForInput(weekAgo);
-
-            startDateInput.value = startDateStr;
-            endDateInput.value = endDateStr;
-
-            console.log(`データベースモード: エラー時フォールバック (${startDateStr} 〜 ${endDateStr})`);
-            this.executeAutoDateSearch(startDateStr, endDateStr);
+        // UIManagerの全ログ読み込み機能を利用
+        if (window.uiManager && typeof window.uiManager.loadAllMessages === 'function') {
+            console.log('データベースモード: 全ログを読み込み');
+            await window.uiManager.loadAllMessages();
+        } else {
+            console.warn('UIManagerの全ログ読み込み機能が利用できません');
         }
     }
 
