@@ -121,12 +121,11 @@ def init_realtime_routes(realtime_manager):
                     'error': 'JSONLファイルが見つかりません'
                 }), 404
 
-            # 最新メッセージを取得
-            limit = request.args.get('limit', 30, type=int)
+            # 全メッセージを取得（limitなし）
             messages = realtime_manager.read_file_messages(
                 latest_file['path'],
-                limit=limit,
-                latest_only=True
+                limit=None,  # 全件取得
+                latest_only=False  # 全ログを取得
             )
 
             return jsonify({
