@@ -292,52 +292,16 @@ class UIManager {
         messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
         messages.forEach((message, index) => {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message ${message.role}`;
-
-            // 日時をyyyy/MM/dd HH:mm:ss形式に変換
-            const timestamp = new Date(message.timestamp).toLocaleString(
-                'ja-JP',
-                {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                }
-            );
-
-            // アイコンと表示名
-            const icon = message.role === 'user' ? '👤' : '🤖';
-            const roleName =
-                message.role === 'user' ? 'ユーザー' : 'アシスタント';
             const messageNumber = index + 1;
+            const messageElement = window.MessageRenderer
+                ? window.MessageRenderer.createMessageElement(message, messageNumber, {
+                      useDetailedFormat: true,
+                      showHashPrefix: true,
+                      enableMarkdown: false,
+                  })
+                : this.createFallbackMessageElement(message, messageNumber);
 
-            messageDiv.innerHTML = `
-                <div class="message-avatar">
-                    <span class="avatar-icon">${icon}</span>
-                </div>
-                <div class="message-bubble">
-                    <div class="message-header">
-                        <span class="message-info">
-                            <span class="message-number">#${messageNumber}</span>
-                            <span class="message-role">${roleName}</span>
-                        </span>
-                        <span class="message-timestamp">${timestamp}</span>
-                        <button class="copy-button"
-                                data-message-index="${index}"
-                                title="クリップボードにコピー"
-                                aria-label="このメッセージをクリップボードにコピーします"
-                                tabindex="0">コピー</button>
-                    </div>
-                    <div class="message-content">${this.formatMessageContent(
-                        message.content
-                    )}</div>
-                </div>
-            `;
-
-            chatContainer.appendChild(messageDiv);
+            chatContainer.appendChild(messageElement);
         });
 
         this.elements.messageArea.appendChild(chatContainer);
@@ -409,19 +373,55 @@ class UIManager {
         }
     }
 
-    formatMessageContent(content) {
-        if (!content) return '';
+    /**
+     * MessageRendererが利用できない場合のフォールバック
+     * @deprecated MessageRendererを使用してください
+     */
+    createFallbackMessageElement(message, messageNumber) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${message.role}`;
 
-        // 改行を<br>に変換
+        const timestamp = new Date(message.timestamp).toLocaleString('ja-JP', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+
+        const icon = message.role === 'user' ? '👤' : '🤖';
+        const roleName = message.role === 'user' ? 'ユーザー' : 'アシスタント';
+
+        let content = message.content || '';
         content = content.replace(/\n/g, '<br>');
-
-        // URLリンク化
         content = content.replace(
             /(https?:\/\/[^\s]+)/g,
             '<a href="$1" target="_blank">$1</a>'
         );
 
-        return content;
+        messageDiv.innerHTML = `
+            <div class="message-avatar">
+                <span class="avatar-icon">${icon}</span>
+            </div>
+            <div class="message-bubble">
+                <div class="message-header">
+                    <span class="message-info">
+                        <span class="message-number">#${messageNumber}</span>
+                        <span class="message-role">${roleName}</span>
+                    </span>
+                    <span class="message-timestamp">${timestamp}</span>
+                    <button class="copy-button"
+                            data-message-index="${messageNumber - 1}"
+                            title="クリップボードにコピー"
+                            aria-label="このメッセージをクリップボードにコピーします"
+                            tabindex="0">コピー</button>
+                </div>
+                <div class="message-content">${content}</div>
+            </div>
+        `;
+
+        return messageDiv;
     }
 
     // UI状態管理
