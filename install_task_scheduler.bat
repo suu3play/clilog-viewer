@@ -1,34 +1,26 @@
 @echo off
-REM clilog-viewer タスクスケジューラ自動登録（管理者権限で実行）
+chcp 65001 >nul
+cls
 
-echo.
-echo ========================================
-echo   clilog-viewer インストーラー
-echo ========================================
-echo.
-
-REM 管理者権限チェック
+REM Check administrator privileges
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo [エラー] 管理者権限が必要です
     echo.
-    echo このファイルを右クリックして
-    echo 「管理者として実行」を選択してください
+    echo [ERROR] Administrator privileges required
+    echo.
+    echo Please right-click this file and select "Run as administrator"
     echo.
     pause
     exit /b 1
 )
 
-REM PowerShellスクリプトを実行
-echo PowerShellスクリプトを起動中...
-echo.
-
+REM Execute PowerShell script
 powershell -ExecutionPolicy Bypass -File "%~dp0install_task_scheduler.ps1"
 
 if %errorLevel% neq 0 (
     echo.
-    echo [エラー] インストールに失敗しました
-    echo 詳細は install_log.txt を確認してください
+    echo [ERROR] Installation failed
+    echo Please check install_log.txt for details
     echo.
     pause
     exit /b 1
