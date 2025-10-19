@@ -263,15 +263,22 @@
 
         <!-- JavaScript -->
         <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+        <!-- 共通ユーティリティモジュール -->
         <script src="/static/js/date-formatter.js"></script>
         <script src="/static/js/message-renderer.js"></script>
         <script src="/static/js/scroll-utils.js"></script>
         <script src="/static/js/virtual-scroller.js"></script>
         <script src="/static/js/copy-utils.js"></script>
         <script src="/static/js/api-client.js"></script>
-        <script src="/static/js/ui-manager.js"></script>
+        <!-- UI管理モジュール（リファクタリング版） -->
+        <script src="/static/js/message-display.js"></script>
+        <script src="/static/js/search-manager.js"></script>
+        <script src="/static/js/date-filter.js"></script>
+        <script src="/static/js/ui-state-manager.js"></script>
+        <!-- リアルタイムモード用モジュール -->
         <script src="/static/js/realtime-client.js"></script>
         <script src="/static/js/polling-client.js"></script>
+        <!-- アプリケーションエントリーポイント -->
         <script src="/static/js/app.js"></script>
     </body>
 </html>
