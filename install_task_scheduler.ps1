@@ -1,4 +1,4 @@
-# clilog-viewer タスクスケジューラ自動登録スクリプト
+﻿# clilog-viewer タスクスケジューラ自動登録スクリプト
 # Windows環境で定期的にlog_converter.pyを実行するタスクを登録します
 
 # 管理者権限チェック

@@ -1,4 +1,4 @@
-# clilog-viewer タスクスケジューラ削除スクリプト
+﻿# clilog-viewer タスクスケジューラ削除スクリプト
 
 # 管理者権限チェック
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
