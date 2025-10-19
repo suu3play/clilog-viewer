@@ -81,7 +81,28 @@ python app.py
 3. **自動更新**: WebSocketでファイル変更をリアルタイム検知・表示
 4. **接続状況**: 画面右上で接続ステータスを確認
 
-### 3. キャッシュ管理
+### 3. 自動実行の設定（Windows）
+Windowsタスクスケジューラに登録して、定期的にログ変換を自動実行できます。
+
+```bash
+# インストール（管理者権限で実行）
+install_task_scheduler.bat を右クリック → 「管理者として実行」
+
+# アンインストール（管理者権限で実行）
+uninstall_task_scheduler.bat を右クリック → 「管理者として実行」
+```
+
+**登録内容**:
+- タスク名: `clilog-viewer-auto-convert`
+- 実行タイミング: 毎日 9:00 AM（インストール時にカスタマイズ可能）
+- 実行内容: `python log_converter.py --force`
+- 動作: バックグラウンドで自動実行、ログ変換を最新状態に保つ
+
+**確認方法**:
+1. Windowsキー + R → `taskschd.msc` と入力
+2. タスクスケジューラライブラリで `clilog-viewer-auto-convert` を確認
+
+### 4. キャッシュ管理
 ```bash
 # 全ファイルのキャッシュを事前作成（推奨）
 cd viewer
@@ -118,10 +139,14 @@ tool:TodoWrite             # ツール名検索
 
 ```
 clilog-viewer/
-├── log_converter.py          # 既存のログ変換スクリプト
-├── log_converter_config.ini  # 設定ファイル
-├── processed_files.json     # 処理済みファイル管理
-├── viewer/                   # 新規：チャットビューアー
+├── log_converter.py              # 既存のログ変換スクリプト
+├── log_converter_config.ini      # 設定ファイル
+├── processed_files.json          # 処理済みファイル管理
+├── install_task_scheduler.bat    # タスクスケジューラ登録（Windows）
+├── install_task_scheduler.ps1    # タスクスケジューラ登録スクリプト
+├── uninstall_task_scheduler.bat  # タスクスケジューラ削除（Windows）
+├── uninstall_task_scheduler.ps1  # タスクスケジューラ削除スクリプト
+├── viewer/                       # 新規：チャットビューアー
 │   ├── app.py               # Flask Webサーバー
 │   ├── message_cache.py     # SQLiteキャッシュシステム
 │   ├── requirements.txt     # Python依存関係
@@ -160,6 +185,35 @@ skip_unchanged = true
 ```
 
 ## トラブルシューティング
+
+### タスクスケジューラ登録に失敗する
+```bash
+# 管理者権限で実行されているか確認
+# install_task_scheduler.bat を右クリックして「管理者として実行」を選択
+
+# Python実行パスの確認
+python --version
+# または
+python3 --version
+
+# install_log.txt でエラー詳細を確認
+type install_log.txt
+```
+
+**よくあるエラー**:
+- 「管理者権限が必要です」→ 右クリックメニューから「管理者として実行」
+- 「Pythonが見つかりません」→ Pythonのインストール確認、PATH設定確認
+- 「log_converter.py が見つかりません」→ プロジェクトルートで実行されているか確認
+
+### タスクが実行されない
+```bash
+# タスクスケジューラで確認
+# Windowsキー + R → taskschd.msc
+
+# タスクの状態を確認
+# 「clilog-viewer-auto-convert」を右クリック → 「実行」でテスト実行
+# 「履歴」タブでエラー確認
+```
 
 ### チャットビューアーが起動しない
 ```bash
