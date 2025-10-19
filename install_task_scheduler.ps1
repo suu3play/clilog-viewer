@@ -34,28 +34,31 @@ if (-not (Test-Path $logConverterPath)) {
 }
 Write-Host "      log_converter.py を確認しました" -ForegroundColor Gray
 
-# Python実行パスを検出
+# Python実行ファイルのフルパスを検出
 Write-Host ""
 Write-Host "[2/5] Python実行パスの検出..." -ForegroundColor Green
 
-$pythonCmd = $null
+$pythonExePath = $null
 $pythonPaths = @("python", "python3", "py")
 
 foreach ($cmd in $pythonPaths) {
     try {
         $version = & $cmd --version 2>&1
         if ($LASTEXITCODE -eq 0) {
-            $pythonCmd = $cmd
-            Write-Host "      Python実行コマンド: $pythonCmd" -ForegroundColor Gray
-            Write-Host "      バージョン: $version" -ForegroundColor Gray
-            break
+            # コマンドの絶対パスを取得
+            $pythonExePath = (Get-Command $cmd -ErrorAction SilentlyContinue).Source
+            if ($pythonExePath) {
+                Write-Host "      Python実行ファイル: $pythonExePath" -ForegroundColor Gray
+                Write-Host "      バージョン: $version" -ForegroundColor Gray
+                break
+            }
         }
     } catch {
         continue
     }
 }
 
-if (-not $pythonCmd) {
+if (-not $pythonExePath) {
     Write-Host "エラー: Pythonが見つかりません" -ForegroundColor Red
     Write-Host "      Pythonがインストールされているか確認してください" -ForegroundColor Yellow
     Read-Host "Enterキーを押して終了"
@@ -109,10 +112,10 @@ Write-Host ""
 Write-Host "[5/5] タスクスケジューラに登録中..." -ForegroundColor Green
 
 try {
-    # アクション: Pythonスクリプトを実行
+    # アクション: Pythonスクリプトを実行（絶対パス使用）
     $action = New-ScheduledTaskAction `
-        -Execute $pythonCmd `
-        -Argument "$logConverterPath --force" `
+        -Execute $pythonExePath `
+        -Argument "`"$logConverterPath`" --force" `
         -WorkingDirectory $projectPath
 
     # トリガー: 毎日指定時刻に実行
@@ -151,7 +154,7 @@ try {
     Write-Host ""
     Write-Host "タスク名: $taskName" -ForegroundColor Cyan
     Write-Host "実行時刻: 毎日 $triggerTime" -ForegroundColor Cyan
-    Write-Host "実行内容: $pythonCmd $logConverterPath --force" -ForegroundColor Cyan
+    Write-Host "実行内容: `"$pythonExePath`" `"$logConverterPath`" --force" -ForegroundColor Cyan
     Write-Host "作業フォルダ: $projectPath" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "タスクスケジューラで確認するには:" -ForegroundColor Yellow
@@ -168,7 +171,7 @@ try {
 登録日時: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 タスク名: $taskName
 実行時刻: 毎日 $triggerTime
-実行コマンド: $pythonCmd $logConverterPath --force
+実行コマンド: "$pythonExePath" "$logConverterPath" --force
 作業フォルダ: $projectPath
 ユーザー: $env:USERNAME
 ステータス: 成功
