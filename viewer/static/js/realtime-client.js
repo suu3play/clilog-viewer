@@ -271,12 +271,29 @@ class RealtimeClient {
     }
 
     createMessageElement(message, messageNumber) {
+        if (window.MessageRenderer) {
+            return window.MessageRenderer.createMessageElement(message, messageNumber, {
+                useDetailedFormat: false,
+                showHashPrefix: false,
+                enableMarkdown: true,
+            });
+        }
+
+        // フォールバック: MessageRendererが利用できない場合
         const div = document.createElement('div');
         div.className = `chat-message ${message.role}`;
 
         const timestamp = new Date(message.timestamp).toLocaleString('ja-JP');
         const avatarIcon = message.role === 'user' ? '👤' : '🤖';
         const roleText = message.role === 'user' ? 'ユーザー' : 'アシスタント';
+
+        let content = message.content || '';
+        content = content
+            .replace(/```json\n([\s\S]*?)\n```/g, '<pre class="code-block json"><code>$1</code></pre>')
+            .replace(/```([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>')
+            .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
 
         div.innerHTML = `
             <div class="message-avatar">
@@ -295,25 +312,11 @@ class RealtimeClient {
                             aria-label="このメッセージをクリップボードにコピーします"
                             tabindex="0">コピー</button>
                 </div>
-                <div class="message-content">
-                    ${this.formatMessageContent(message.content)}
-                </div>
+                <div class="message-content">${content}</div>
             </div>
         `;
 
         return div;
-    }
-
-    formatMessageContent(content) {
-        // Markdownライクな基本的なフォーマッティング
-        content = content
-            .replace(/```json\n([\s\S]*?)\n```/g, '<pre class="code-block json"><code>$1</code></pre>')
-            .replace(/```([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>')
-            .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\n/g, '<br>');
-
-        return content;
     }
 
     handleFileUpdate(data) {
