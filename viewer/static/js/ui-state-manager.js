@@ -332,6 +332,58 @@ class UIStateManager {
             return dateStr;
         }
     }
+
+    // DateFilterメソッドへの後方互換性プロキシ
+    async loadAllMessages() {
+        if (this.dateFilter && typeof this.dateFilter.loadAllMessages === 'function') {
+            return await this.dateFilter.loadAllMessages();
+        }
+        console.warn('DateFilterが初期化されていません');
+    }
+
+    async loadMessagesByDateRange(startDate, endDate) {
+        if (this.dateFilter && typeof this.dateFilter.loadMessagesByDateRange === 'function') {
+            return await this.dateFilter.loadMessagesByDateRange(startDate, endDate);
+        }
+        console.warn('DateFilterが初期化されていません');
+    }
+
+    async handleDateSearch() {
+        if (this.dateFilter && typeof this.dateFilter.handleDateSearch === 'function') {
+            return await this.dateFilter.handleDateSearch();
+        }
+        console.warn('DateFilterが初期化されていません');
+    }
+
+    // MessageDisplayメソッドへの後方互換性プロキシ
+    displayMessages(messages) {
+        if (this.messageDisplay && typeof this.messageDisplay.displayMessages === 'function') {
+            return this.messageDisplay.displayMessages(messages);
+        }
+        console.warn('MessageDisplayが初期化されていません');
+    }
+
+    scrollToBottom() {
+        if (this.messageDisplay && typeof this.messageDisplay.scrollToBottom === 'function') {
+            return this.messageDisplay.scrollToBottom();
+        }
+        console.warn('MessageDisplayが初期化されていません');
+    }
+
+    showWelcomeMessage() {
+        if (this.messageDisplay && typeof this.messageDisplay.showWelcomeMessage === 'function') {
+            return this.messageDisplay.showWelcomeMessage();
+        }
+        console.warn('MessageDisplayが初期化されていません');
+    }
+
+    // SearchManagerメソッドへの後方互換性プロキシ
+    async handleSearch() {
+        if (this.searchManager && typeof this.searchManager.handleSearch === 'function') {
+            return await this.searchManager.handleSearch();
+        }
+        console.warn('SearchManagerが初期化されていません');
+    }
 }
 
 // グローバルに公開（後方互換性を維持）
