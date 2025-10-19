@@ -1,189 +1,274 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>clilog-viewer</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/realtime.css">
-</head>
-<body>
-    <div id="app">
-        <!-- ヘッダー -->
-        <header class="header">
-            <div class="header-content">
-                <h1 class="title">🤖 clilog-viewer</h1>
-                <div class="header-controls">
-                    <!-- リアルタイムモード切り替え -->
-                    <div class="mode-selector">
-                        <button id="dbModeBtn" class="mode-btn" data-mode="database">
-                            💾 データベースモード
-                        </button>
-                        <button id="realtimeModeBtn" class="mode-btn" data-mode="realtime">
-                            ⚡ リアルタイムモード
-                        </button>
-                    </div>
-
-                    <!-- リアルタイムモード接続ステータス -->
-                    <div id="connectionStatus" class="connection-status hidden">
-                        <span class="status-indicator" id="statusIndicator">●</span>
-                        <span id="statusText">未接続</span>
-                    </div>
-
-                    <!-- ポーリング制御（リアルタイムモード用） -->
-                    <div id="pollingControls" class="polling-controls hidden">
-                        <div class="polling-toggle-container">
-                            <label class="polling-toggle-label">
-                                <input type="checkbox" id="pollingToggle" class="polling-toggle">
-                                <span class="toggle-slider"></span>
-                                自動更新
-                            </label>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>clilog-viewer</title>
+        <link rel="stylesheet" href="/static/css/style.css" />
+        <link rel="stylesheet" href="/static/css/realtime.css" />
+    </head>
+    <body>
+        <div id="app">
+            <!-- ヘッダー -->
+            <header class="header">
+                <div class="header-content">
+                    <h1 class="title">🤖 clilog-viewer1</h1>
+                    <div class="header-controls">
+                        <!-- リアルタイムモード切り替え -->
+                        <div class="mode-selector">
+                            <button
+                                id="dbModeBtn"
+                                class="mode-btn"
+                                data-mode="database"
+                            >
+                                💾 データベースモード
+                            </button>
+                            <button
+                                id="realtimeModeBtn"
+                                class="mode-btn"
+                                data-mode="realtime"
+                            >
+                                ⚡ リアルタイムモード
+                            </button>
                         </div>
-                        <div class="polling-interval-container">
-                            <label for="pollingInterval">間隔:</label>
-                            <select id="pollingInterval" class="polling-interval">
-                                <option value="3">3秒</option>
-                                <option value="5" selected>5秒</option>
-                                <option value="10">10秒</option>
-                                <option value="30">30秒</option>
-                                <option value="60">1分</option>
-                            </select>
+
+                        <!-- リアルタイムモード接続ステータス -->
+                        <div
+                            id="connectionStatus"
+                            class="connection-status hidden"
+                        >
+                            <span class="status-indicator" id="statusIndicator"></span>
+                            <span id="statusText">未接続</span>
+                        </div>
+
+                        <!-- ポーリング制御（リアルタイムモード用） -->
+                        <div
+                            id="pollingControls"
+                            class="polling-controls hidden"
+                        >
+                            <div class="polling-toggle-container">
+                                <label class="polling-toggle-label">
+                                    <input
+                                        type="checkbox"
+                                        id="pollingToggle"
+                                        class="polling-toggle"
+                                    />
+                                    <span class="toggle-slider"></span>
+                                    自動更新
+                                </label>
+                            </div>
+                            <div class="polling-interval-container">
+                                <label for="pollingInterval">間隔:</label>
+                                <select
+                                    id="pollingInterval"
+                                    class="polling-interval"
+                                >
+                                    <option value="3">3秒</option>
+                                    <option value="5" selected>5秒</option>
+                                    <option value="10">10秒</option>
+                                    <option value="30">30秒</option>
+                                    <option value="60">1分</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- ログ変換ボタン（データベースモード専用） -->
+                        <div
+                            id="logConverterContainer"
+                            class="log-converter-container"
+                        >
+                            <button
+                                id="logConverterBtn"
+                                class="log-converter-btn"
+                                title="ログファイルをデータベースに変換・更新"
+                            >
+                                🔄 ログ変換
+                            </button>
+                            <div
+                                id="converterStatus"
+                                class="converter-status hidden"
+                            >
+                                <div class="converter-loading">
+                                    <div
+                                        class="converter-loading-spinner"
+                                    ></div>
+                                    <span class="converter-loading-text"
+                                        >変換中...</span
+                                    >
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="search-container">
+                            <input
+                                type="text"
+                                id="searchInput"
+                                placeholder="メッセージを検索..."
+                                class="search-input"
+                            />
+                            <button id="searchBtn" class="search-btn">
+                                🔍
+                            </button>
+                            <div id="searchLoading" class="search-loading">
+                                <div class="search-loading-spinner"></div>
+                                <span class="search-loading-text"
+                                    >検索中...</span
+                                >
+                            </div>
+                        </div>
+                        <div
+                            class="date-search-container"
+                            id="dateSearchContainer"
+                        >
+                            <input
+                                type="date"
+                                id="startDate"
+                                class="date-input"
+                                title="開始日"
+                            />
+                            <span class="date-separator">-</span>
+                            <input
+                                type="date"
+                                id="endDate"
+                                class="date-input"
+                                title="終了日"
+                            />
+                            <button id="dateSearchBtn" class="date-search-btn">
+                                📅 日付検索
+                            </button>
+                            <button
+                                id="clearSearchBtn"
+                                class="clear-btn"
+                                title="検索条件をクリア"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div class="status-display">
+                            <span id="fileStatus" class="file-status"></span>
                         </div>
                     </div>
+                </div>
+            </header>
 
-                    <!-- ログ変換ボタン（データベースモード専用） -->
-                    <div id="logConverterContainer" class="log-converter-container">
-                        <button id="logConverterBtn" class="log-converter-btn" title="ログファイルをデータベースに変換・更新">
-                            🔄 ログ変換
-                        </button>
-                        <div id="converterStatus" class="converter-status hidden">
-                            <div class="converter-loading">
-                                <div class="converter-loading-spinner"></div>
-                                <span class="converter-loading-text">変換中...</span>
+            <!-- メインコンテンツ -->
+            <main class="main">
+                <!-- チャット領域 -->
+                <section class="chat-area">
+                    <!-- ローディング表示 -->
+                    <div id="loading" class="loading hidden">
+                        <div class="loading-spinner"></div>
+                        <p>読み込み中...</p>
+                    </div>
+
+                    <!-- メッセージ表示エリア -->
+                    <div id="messageArea" class="message-area">
+                        <div class="welcome-message">
+                            <h2>CliLog Viewer へようこそ</h2>
+                            <p>
+                                左側の日付範囲を選択して会話ログを表示してください。
+                            </p>
+                            <div class="features">
+                                <div class="feature">
+                                    <h3>⚡ 高速読み込み</h3>
+                                    <p>SQLiteキャッシュによる超高速表示</p>
+                                </div>
+                                <div class="feature">
+                                    <h3>🔍 高速検索</h3>
+                                    <p>全文検索で瞬時に目的の会話を発見</p>
+                                </div>
+                                <div class="feature">
+                                    <h3>📱 レスポンシブ</h3>
+                                    <p>デスクトップ・モバイルどちらでも快適</p>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="search-container">
-                        <input type="text" id="searchInput" placeholder="メッセージを検索..." class="search-input">
-                        <button id="searchBtn" class="search-btn">🔍</button>
-                        <div id="searchLoading" class="search-loading">
-                            <div class="search-loading-spinner"></div>
-                            <span class="search-loading-text">検索中...</span>
+                    <!-- Virtual Scrolling用のコンテナ -->
+                    <div id="virtualScroller" class="virtual-scroller hidden">
+                        <div id="scrollContent" class="scroll-content"></div>
+                        <div id="pagination" class="pagination hidden">
+                            <button
+                                id="prevPage"
+                                class="pagination-btn"
+                                disabled
+                            >
+                                ‹ 前へ
+                            </button>
+                            <div class="pagination-info">
+                                <span id="currentPage">1</span> /
+                                <span id="totalPages">1</span> (<span
+                                    id="totalMessages"
+                                    >0</span
+                                >メッセージ中
+                                <span id="messageRange">1-50</span>)
+                            </div>
+                            <button
+                                id="nextPage"
+                                class="pagination-btn"
+                                disabled
+                            >
+                                次へ ›
+                            </button>
                         </div>
                     </div>
-                    <div class="date-search-container" id="dateSearchContainer">
-                        <input type="date" id="startDate" class="date-input" title="開始日">
-                        <span class="date-separator">-</span>
-                        <input type="date" id="endDate" class="date-input" title="終了日">
-                        <button id="dateSearchBtn" class="date-search-btn">📅 日付検索</button>
-                        <button id="clearSearchBtn" class="clear-btn" title="検索条件をクリア">✕</button>
-                    </div>
-                    <div class="status-display">
-                        <span id="fileStatus" class="file-status"></span>
-                    </div>
-                </div>
-            </div>
-        </header>
 
-        <!-- メインコンテンツ -->
-        <main class="main">
-            <!-- チャット領域 -->
-            <section class="chat-area">
-                <!-- ローディング表示 -->
-                <div id="loading" class="loading hidden">
-                    <div class="loading-spinner"></div>
-                    <p>読み込み中...</p>
-                </div>
-
-                <!-- メッセージ表示エリア -->
-                <div id="messageArea" class="message-area">
-                    <div class="welcome-message">
-                        <h2>CliLog Viewer へようこそ</h2>
-                        <p>左側の日付範囲を選択して会話ログを表示してください。</p>
-                        <div class="features">
-                            <div class="feature">
-                                <h3>⚡ 高速読み込み</h3>
-                                <p>SQLiteキャッシュによる超高速表示</p>
-                            </div>
-                            <div class="feature">
-                                <h3>🔍 高速検索</h3>
-                                <p>全文検索で瞬時に目的の会話を発見</p>
-                            </div>
-                            <div class="feature">
-                                <h3>📱 レスポンシブ</h3>
-                                <p>デスクトップ・モバイルどちらでも快適</p>
-                            </div>
+                    <!-- 検索結果 -->
+                    <div id="searchResults" class="search-results hidden">
+                        <div class="search-header">
+                            <h3 id="searchTitle">検索結果</h3>
+                            <button id="closeSearch" class="close-btn">
+                                ×
+                            </button>
                         </div>
+                        <div id="searchList" class="search-list"></div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- フッター -->
+            <footer class="footer">
+                <div class="footer-content">
+                    <div class="stats" id="stats">
+                        <span id="messageCount">メッセージ: 0</span>
+                        <span id="cacheStatus">キャッシュ: 未読み込み</span>
+                        <span id="loadTime">読み込み時間: -</span>
+                    </div>
+                    <div class="theme-toggle">
+                        <button id="themeToggle" class="theme-btn">🌙</button>
                     </div>
                 </div>
+            </footer>
+        </div>
 
-                <!-- Virtual Scrolling用のコンテナ -->
-                <div id="virtualScroller" class="virtual-scroller hidden">
-                    <div id="scrollContent" class="scroll-content"></div>
-                    <div id="pagination" class="pagination hidden">
-                        <button id="prevPage" class="pagination-btn" disabled>‹ 前へ</button>
-                        <div class="pagination-info">
-                            <span id="currentPage">1</span> / <span id="totalPages">1</span>
-                            (<span id="totalMessages">0</span>メッセージ中 <span id="messageRange">1-50</span>)
-                        </div>
-                        <button id="nextPage" class="pagination-btn" disabled>次へ ›</button>
-                    </div>
+        <!-- モーダル -->
+        <div id="modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle">タイトル</h3>
+                    <button id="modalClose" class="close-btn">×</button>
                 </div>
-
-                <!-- 検索結果 -->
-                <div id="searchResults" class="search-results hidden">
-                    <div class="search-header">
-                        <h3 id="searchTitle">検索結果</h3>
-                        <button id="closeSearch" class="close-btn">×</button>
-                    </div>
-                    <div id="searchList" class="search-list"></div>
+                <div id="modalBody" class="modal-body">
+                    <!-- モーダル内容 -->
                 </div>
-            </section>
-        </main>
-
-        <!-- フッター -->
-        <footer class="footer">
-            <div class="footer-content">
-                <div class="stats" id="stats">
-                    <span id="messageCount">メッセージ: 0</span>
-                    <span id="cacheStatus">キャッシュ: 未読み込み</span>
-                    <span id="loadTime">読み込み時間: -</span>
-                </div>
-                <div class="theme-toggle">
-                    <button id="themeToggle" class="theme-btn">🌙</button>
-                </div>
-            </div>
-        </footer>
-    </div>
-
-    <!-- モーダル -->
-    <div id="modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">タイトル</h3>
-                <button id="modalClose" class="close-btn">×</button>
-            </div>
-            <div id="modalBody" class="modal-body">
-                <!-- モーダル内容 -->
             </div>
         </div>
-    </div>
 
-    <!-- 通知 -->
-    <div id="notifications" class="notifications"></div>
+        <!-- 通知 -->
+        <div id="notifications" class="notifications"></div>
 
-    <!-- JavaScript -->
-    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
-    <script src="/static/js/date-formatter.js"></script>
-    <script src="/static/js/message-renderer.js"></script>
-    <script src="/static/js/scroll-utils.js"></script>
-    <script src="/static/js/virtual-scroller.js"></script>
-    <script src="/static/js/copy-utils.js"></script>
-    <script src="/static/js/api-client.js"></script>
-    <script src="/static/js/ui-manager.js"></script>
-    <script src="/static/js/realtime-client.js"></script>
-    <script src="/static/js/polling-client.js"></script>
-    <script src="/static/js/app.js"></script>
-</body>
+        <!-- JavaScript -->
+        <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+        <script src="/static/js/date-formatter.js"></script>
+        <script src="/static/js/message-renderer.js"></script>
+        <script src="/static/js/scroll-utils.js"></script>
+        <script src="/static/js/virtual-scroller.js"></script>
+        <script src="/static/js/copy-utils.js"></script>
+        <script src="/static/js/api-client.js"></script>
+        <script src="/static/js/ui-manager.js"></script>
+        <script src="/static/js/realtime-client.js"></script>
+        <script src="/static/js/polling-client.js"></script>
+        <script src="/static/js/app.js"></script>
+    </body>
 </html>
