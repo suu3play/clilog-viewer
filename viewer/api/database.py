@@ -7,6 +7,10 @@ from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional, List, Dict, Any, Union
 
+# 入力検証とセキュリティ
+from .validators import InputValidator
+from .exceptions import ConnectionError as DBConnectionError, QueryError
+
 
 class DatabaseManager:
     """データベース操作マネージャー"""
@@ -180,24 +184,28 @@ class DatabaseManager:
         Returns:
             検索結果のリスト
         """
+        # 入力検証とサニタイズ
+        sanitized_query = InputValidator.sanitize_like_pattern(query)
+        validated_limit = InputValidator.validate_and_sanitize_limit(limit)
+
         if file_filter:
             sql_query = '''
                 SELECT role, timestamp, content, filename
                 FROM conversations
-                WHERE content LIKE ? AND filename = ?
+                WHERE content LIKE ? ESCAPE '\\' AND filename = ?
                 ORDER BY datetime(timestamp) DESC
                 LIMIT ?
             '''
-            params = (f'%{query}%', file_filter, limit)
+            params = (f'%{sanitized_query}%', file_filter, validated_limit)
         else:
             sql_query = '''
                 SELECT role, timestamp, content, filename
                 FROM conversations
-                WHERE content LIKE ?
+                WHERE content LIKE ? ESCAPE '\\'
                 ORDER BY datetime(timestamp) DESC
                 LIMIT ?
             '''
-            params = (f'%{query}%', limit)
+            params = (f'%{sanitized_query}%', validated_limit)
 
         rows = self.execute_query(sql_query, params, fetch_all=True)
 
@@ -229,6 +237,9 @@ class DatabaseManager:
         Returns:
             検索結果のリスト
         """
+        # 入力検証
+        validated_limit = InputValidator.validate_and_sanitize_limit(limit)
+
         query = '''
             SELECT role, timestamp, content, filename
             FROM conversations
@@ -236,7 +247,7 @@ class DatabaseManager:
             ORDER BY datetime(timestamp) DESC
             LIMIT ?
         '''
-        rows = self.execute_query(query, (start_date, end_date, limit), fetch_all=True)
+        rows = self.execute_query(query, (start_date, end_date, validated_limit), fetch_all=True)
 
         results = []
         for row in rows:
