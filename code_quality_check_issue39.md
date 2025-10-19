@@ -41,16 +41,17 @@ node -c viewer/static/js/ui-state-manager.js
 | date-filter.js | 214行 | ✅ 合格 |
 | search-manager.js | 128行 | ✅ 合格 |
 | message-display.js | 180行 | ✅ 合格 |
-| ui-state-manager.js | 340行 | ⚠️ 300行を若干超過（許容範囲内） |
+| ui-state-manager.js | 392行 | ⚠️ 300行を超過（後方互換性のため許容範囲内） |
 
-**総計**: 862行（旧ui-manager.js: 707行）
+**総計**: 914行（旧ui-manager.js: 707行）
 
 **評価**:
-- ui-state-manager.jsが340行と300行を若干超過していますが、以下の理由により許容範囲内と判断:
+- ui-state-manager.jsが392行と300行を超過していますが、以下の理由により許容範囲内と判断:
   1. 旧ui-manager.js（707行）から大幅に削減
   2. コア機能（初期化、イベント管理、UI状態管理）を集約した結果
   3. 単一責任の原則に準拠している
-  4. さらなる分割は過度なモジュール化となり、かえって保守性が低下する
+  4. **後方互換性プロキシメソッド（52行）を追加**し、既存のrealtime-client.jsとpolling-client.jsとの互換性を維持
+  5. さらなる分割は過度なモジュール化となり、かえって保守性が低下する
 
 ### 3. null/undefined チェック
 
