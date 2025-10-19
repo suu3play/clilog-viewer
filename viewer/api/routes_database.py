@@ -4,13 +4,53 @@
 """
 import sys
 import subprocess
+import logging
 from pathlib import Path
 from datetime import datetime
+from functools import wraps
 from flask import Blueprint, request, jsonify
 from .database import DatabaseManager
+from .validators import InputValidator, ValidationError
+from .exceptions import DatabaseError, ConnectionError, QueryError
+
+# ロガー設定
+logger = logging.getLogger(__name__)
 
 # Blueprintの作成
 database_bp = Blueprint('database', __name__, url_prefix='/api')
+
+
+def handle_database_errors(f):
+    """
+    データベースエラーを統一的に処理するデコレーター
+
+    エラーメッセージからの情報漏洩を防ぎ、ユーザーには安全なメッセージのみを返します。
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except ValidationError as e:
+            # 入力検証エラー: ユーザーに詳細を伝える
+            logger.warning(f"Validation error in {f.__name__}: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 400
+        except ConnectionError as e:
+            # 接続エラー: 内部情報を隠蔽
+            logger.error(f"Connection error in {f.__name__}: {e.message}")
+            return jsonify({'success': False, 'error': e.user_message}), 503
+        except QueryError as e:
+            # クエリエラー: 内部情報を隠蔽
+            logger.error(f"Query error in {f.__name__}: {e.message}")
+            return jsonify({'success': False, 'error': e.user_message}), 500
+        except DatabaseError as e:
+            # データベースエラー: 内部情報を隠蔽
+            logger.error(f"Database error in {f.__name__}: {e.message}")
+            return jsonify({'success': False, 'error': e.user_message}), 500
+        except Exception as e:
+            # 予期しないエラー: 内部情報を隠蔽
+            logger.error(f"Unexpected error in {f.__name__}: {str(e)}", exc_info=True)
+            return jsonify({'success': False, 'error': 'サーバーエラーが発生しました'}), 500
+    return decorated_function
 
 
 def init_database_routes(db_manager: DatabaseManager):
@@ -70,73 +110,54 @@ def init_database_routes(db_manager: DatabaseManager):
             }), 500
 
     @database_bp.route('/search')
+    @handle_database_errors
     def search_messages():
         """高速全文検索"""
-        try:
-            query = request.args.get('q', '').strip()
-            file_filter = request.args.get('file')
-            limit = request.args.get('limit', 100, type=int)
+        query = request.args.get('q', '').strip()
+        file_filter = request.args.get('file')
+        limit = request.args.get('limit', 100, type=int)
 
-            if not query:
-                return jsonify({
-                    'success': False,
-                    'error': 'クエリが空です'
-                })
+        if not query:
+            raise ValidationError('検索クエリを入力してください')
 
-            results = db_manager.search_messages(query, file_filter, limit)
+        results = db_manager.search_messages(query, file_filter, limit)
 
-            return jsonify({
-                'success': True,
-                'results': results,
-                'query': query,
-                'total': len(results)
-            })
-
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+        return jsonify({
+            'success': True,
+            'results': results,
+            'query': query,
+            'total': len(results)
+        })
 
     @database_bp.route('/search/date-range')
+    @handle_database_errors
     def search_messages_by_date_range():
         """日付範囲による検索"""
-        try:
-            start_date = request.args.get('start_date', '').strip()
-            end_date = request.args.get('end_date', '').strip()
-            limit = request.args.get('limit', 1000, type=int)
+        start_date = request.args.get('start_date', '').strip()
+        end_date = request.args.get('end_date', '').strip()
+        limit = request.args.get('limit', 1000, type=int)
 
-            if not start_date or not end_date:
-                return jsonify({
-                    'success': False,
-                    'error': '開始日と終了日の両方を指定してください'
-                })
+        if not start_date or not end_date:
+            raise ValidationError('開始日と終了日の両方を指定してください')
 
-            # 日付フォーマット検証
-            try:
-                datetime.strptime(start_date, '%Y-%m-%d')
-                datetime.strptime(end_date, '%Y-%m-%d')
-            except ValueError:
-                return jsonify({
-                    'success': False,
-                    'error': '日付形式はYYYY-MM-DD形式で入力してください'
-                })
+        # 日付フォーマット検証
+        valid_start, error_start = InputValidator.validate_date(start_date)
+        if not valid_start:
+            raise ValidationError(error_start)
 
-            results = db_manager.search_by_date_range(start_date, end_date, limit)
+        valid_end, error_end = InputValidator.validate_date(end_date)
+        if not valid_end:
+            raise ValidationError(error_end)
 
-            return jsonify({
-                'success': True,
-                'results': results,
-                'start_date': start_date,
-                'end_date': end_date,
-                'total': len(results)
-            })
+        results = db_manager.search_by_date_range(start_date, end_date, limit)
 
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500
+        return jsonify({
+            'success': True,
+            'results': results,
+            'start_date': start_date,
+            'end_date': end_date,
+            'total': len(results)
+        })
 
     @database_bp.route('/date-range')
     def get_date_range():
