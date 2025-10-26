@@ -11,8 +11,11 @@ from pathlib import Path
 import configparser
 import os
 import getpass
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class BaseLogParser(ABC):
@@ -145,13 +148,14 @@ def format_timestamp(timestamp_str):
     try:
         # UTC時刻をパース
         dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-        
+
         # JSTに変換（UTC+9）
         jst = timezone(timedelta(hours=9))
         dt_jst = dt.astimezone(jst)
-        
+
         return dt_jst.strftime('%Y-%m-%d %H:%M:%S JST')
-    except:
+    except (ValueError, AttributeError) as e:
+        logger.warning(f"タイムスタンプのパースエラー: {timestamp_str} - {e}")
         return timestamp_str
 
 
@@ -160,14 +164,15 @@ def convert_utc_to_jst(timestamp_str):
     try:
         # UTC時刻をパース
         dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-        
+
         # JSTに変換（UTC+9）
         jst = timezone(timedelta(hours=9))
         dt_jst = dt.astimezone(jst)
-        
+
         # SQLiteで使いやすい形式で返す
         return dt_jst.strftime('%Y-%m-%d %H:%M:%S')
-    except:
+    except (ValueError, AttributeError) as e:
+        logger.warning(f"タイムスタンプの変換エラー: {timestamp_str} - {e}")
         # パースできない場合は元の形式を返す
         return timestamp_str
 
@@ -178,7 +183,8 @@ def parse_message_date(timestamp_str):
         # UTC時刻をパース
         dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
         return dt
-    except:
+    except (ValueError, AttributeError) as e:
+        logger.warning(f"日付の解析エラー: {timestamp_str} - {e}")
         return None
 
 
