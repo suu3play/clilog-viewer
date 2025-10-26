@@ -151,13 +151,20 @@ def init_database_routes(db_manager: DatabaseManager):
 
         results = db_manager.search_by_date_range(start_date, end_date, limit)
 
-        return jsonify({
+        response = jsonify({
             'success': True,
             'results': results,
             'start_date': start_date,
             'end_date': end_date,
             'total': len(results)
         })
+
+        # キャッシュ無効化ヘッダーを追加
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+        return response
 
     @database_bp.route('/date-range')
     def get_date_range():
@@ -171,10 +178,17 @@ def init_database_routes(db_manager: DatabaseManager):
 
             date_range = db_manager.get_date_range()
 
-            return jsonify({
+            response = jsonify({
                 'success': True,
                 **date_range
             })
+
+            # キャッシュ無効化ヘッダーを追加
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+
+            return response
 
         except Exception as e:
             return jsonify({
