@@ -6,6 +6,7 @@
 import json
 import os
 import time
+import logging
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Callable
@@ -19,6 +20,8 @@ except ImportError:
     WATCHDOG_AVAILABLE = False
     print("警告: watchdogライブラリが利用できません。ファイル監視機能は無効です。")
 import threading
+
+logger = logging.getLogger(__name__)
 
 
 class JSONLFileReader:
@@ -196,14 +199,15 @@ class JSONLFileReader:
         try:
             # UTC時刻をパース
             dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-            
+
             # JSTに変換（UTC+9）
             jst = timezone(timedelta(hours=9))
             dt_jst = dt.astimezone(jst)
-            
+
             # SQLiteで使いやすい形式で返す
             return dt_jst.strftime('%Y-%m-%d %H:%M:%S')
-        except:
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"タイムスタンプの変換エラー: {timestamp_str} - {e}")
             # パースできない場合は現在時刻を返す
             return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
