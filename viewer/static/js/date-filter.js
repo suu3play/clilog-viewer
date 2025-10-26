@@ -86,8 +86,10 @@ class DateFilter {
             console.log('loadAllMessages() が呼び出されました');
             this.uiStateManager.showLoading('すべてのメッセージを読み込み中...');
 
-            // まず利用可能な日付範囲を取得
-            const dateRangeResponse = await fetch('/api/date-range');
+            // まず利用可能な日付範囲を取得（キャッシュを使用しない）
+            const dateRangeResponse = await fetch('/api/date-range', {
+                cache: 'no-store'
+            });
             const dateRangeData = await dateRangeResponse.json();
 
             if (
@@ -98,9 +100,10 @@ class DateFilter {
                 throw new Error('日付範囲の取得に失敗しました');
             }
 
-            // 全データを取得（実際のデータベースの全日付範囲）
+            // 全データを取得（実際のデータベースの全日付範囲、キャッシュを使用しない）
             const response = await fetch(
-                `/api/search/date-range?start_date=${dateRangeData.min_date}&end_date=${dateRangeData.max_date}&limit=5000`
+                `/api/search/date-range?start_date=${dateRangeData.min_date}&end_date=${dateRangeData.max_date}&limit=5000`,
+                { cache: 'no-store' }
             );
             console.log('API response received:', response.status);
             const data = await response.json();
