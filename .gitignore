@@ -30,3 +30,4 @@ viewer/cache/*.db
 viewer/cache/*.db-*
 *.log
 *.db
+*.tgz
