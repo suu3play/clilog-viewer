@@ -1,0 +1,52 @@
+# Development files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Logs and cache
+logs/
+cache/
+viewer/cache/
+*.log
+processed_files.json
+
+# Documentation (build artifacts)
+docs/
+code_quality_check*.md
+issue*.md
+
+# Test and development
+test/
+tests/
+.pytest_cache/
+coverage/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
