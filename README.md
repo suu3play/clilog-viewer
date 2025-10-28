@@ -40,18 +40,86 @@ AI CLIツールの会話ログをMarkdownファイルに変換し、高速チャ
 - 標準ライブラリ（sqlite3, hashlib）
 
 ### インストール
+
+#### オプション1: npmパッケージからインストール（推奨）
+
+```bash
+# npmパッケージをインストール
+npm install @suu3play/clilog-viewer
+
+# Python依存関係をインストール
+cd node_modules/@suu3play/clilog-viewer/viewer
+pip install -r requirements.txt
+```
+
+#### オプション2: GitHubからクローン
+
 ```bash
 # プロジェクトをクローンまたはダウンロード
+git clone https://github.com/suu3play/clilog-viewer.git
 cd clilog-viewer
 
-# チャットビューアー用依存関係インストール（新機能用）
+# チャットビューアー用依存関係インストール
 cd viewer
 pip install -r requirements.txt
 ```
 
 ## 使用方法
 
-### 1. ログ変換（従来通り）
+### npmパッケージとしての使用
+
+npmパッケージからインストールした場合の使用方法：
+
+#### 1. ログ変換
+```bash
+# パッケージディレクトリに移動
+cd node_modules/@suu3play/clilog-viewer
+
+# 設定に基づく自動処理（推奨）
+python log_converter.py
+
+# 利用可能ファイル一覧表示
+python log_converter.py --list
+
+# 特定ファイルを変換
+python log_converter.py path/to/conversation.jsonl
+```
+
+#### 2. npmスクリプトとして実行（推奨）
+プロジェクトの`package.json`にスクリプトを追加：
+
+```json
+{
+  "scripts": {
+    "log:convert": "cd node_modules/@suu3play/clilog-viewer && python log_converter.py",
+    "log:list": "cd node_modules/@suu3play/clilog-viewer && python log_converter.py --list",
+    "log:viewer": "cd node_modules/@suu3play/clilog-viewer/viewer && python app.py"
+  }
+}
+```
+
+実行：
+```bash
+npm run log:convert
+npm run log:list
+npm run log:viewer
+```
+
+#### 3. チャットビューアー起動
+```bash
+# Windowsの場合
+cd node_modules/@suu3play/clilog-viewer/viewer
+run.bat
+
+# または手動起動
+python app.py
+```
+
+ブラウザで `http://localhost:5000` にアクセス
+
+### GitHubクローン版の使用方法
+
+#### 1. ログ変換
 ```bash
 # 設定に基づく自動処理（推奨）
 python log_converter.py
@@ -63,7 +131,7 @@ python log_converter.py --list
 python log_converter.py path/to/conversation.jsonl
 ```
 
-### 2. チャットビューアー（データベース + リアルタイム対応）
+#### 2. チャットビューアー（データベース + リアルタイム対応）
 ```bash
 # Windowsの場合
 cd viewer
@@ -258,23 +326,50 @@ python log_converter.py --list
 4. **Virtual Scrolling**: DOM要素最小化
 5. **レスポンシブ画像**: 軽量アセット読み込み
 
+## パッケージ情報
+
+### npm公開情報
+- **パッケージ名**: `@suu3play/clilog-viewer`
+- **バージョン**: 2.0.0
+- **npm**: https://www.npmjs.com/package/@suu3play/clilog-viewer
+- **GitHub**: https://github.com/suu3play/clilog-viewer
+- **ライセンス**: MIT
+
+### インストール
+```bash
+npm install @suu3play/clilog-viewer
+```
+
+### アップデート
+```bash
+# 最新バージョンを確認
+npm view @suu3play/clilog-viewer version
+
+# 最新版に更新
+npm update @suu3play/clilog-viewer
+```
+
 ## ライセンス
 
 MIT License
 
 ---
 
-### 更新履歴
+## 更新履歴
 
-**v2.0.0** (新規)
+詳細は[CHANGELOG.md](CHANGELOG.md)を参照してください。
+
+**v2.0.0** (2025-10-28)
+- npmパッケージとして公開
 - 高速チャットビューアー追加
 - SQLiteキャッシュシステム実装
 - Virtual Scrolling対応
 - 全文検索機能（FTS5）
 - レスポンシブデザイン
 - ダーク/ライトテーマ
+- リアルタイムビューアー機能
 
-**v1.0.0** (既存)
+**v1.0.0** (2024-09-06)
 - JSONLからMarkdown変換
 - 設定ファイル対応
 - 増分更新処理
