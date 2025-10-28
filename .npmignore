@@ -1,5 +1,5 @@
-# Development files
-__pycache__/
+# Python cache files
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -49,4 +49,3 @@ htmlcov/
 # Temporary files
 *.tmp
 *.bak
-*.swp

@@ -45,7 +45,12 @@
     "install_task_scheduler.ps1",
     "uninstall_task_scheduler.bat",
     "uninstall_task_scheduler.ps1",
-    "viewer/",
+    "viewer/*.py",
+    "viewer/*.bat",
+    "viewer/*.txt",
+    "viewer/api/*.py",
+    "viewer/static/**/*",
+    "viewer/templates/**/*",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
