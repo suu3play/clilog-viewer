@@ -1,5 +1,10 @@
 # clilog-viewer - Multi-AI CLI Log Converter & Viewer
 
+![Test](https://github.com/suu3play/clilog-viewer/workflows/Test/badge.svg)
+![Code Quality](https://github.com/suu3play/clilog-viewer/workflows/Code%20Quality/badge.svg)
+[![npm version](https://badge.fury.io/js/%40suu3play%2Fclilog-viewer.svg)](https://www.npmjs.com/package/@suu3play/clilog-viewer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 AI CLIツールの会話ログをMarkdownファイルに変換し、高速チャットビューアーで表示するPythonツール
 
 ## 概要

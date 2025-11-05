@@ -1,0 +1,95 @@
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  lint-python:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 pylint isort
+
+    - name: Check code formatting with Black
+      run: black --check . --exclude='/(\.git|\.venv|venv|node_modules|__pycache__|\.pytest_cache)/'
+
+    - name: Check import sorting with isort
+      run: isort --check-only . --skip .git --skip .venv --skip venv --skip node_modules
+
+    - name: Lint with flake8
+      run: |
+        # E501: line too long (handled by black)
+        # W503: line break before binary operator (conflicts with black)
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.git,.venv,venv,node_modules,__pycache__
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics --exclude=.git,.venv,venv,node_modules,__pycache__ --ignore=E501,W503
+
+  lint-javascript:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Lint JavaScript
+      run: |
+        if [ -f "package.json" ] && grep -q "\"lint\"" package.json; then
+          npm run lint || echo "Lint script not configured yet"
+        else
+          echo "Lint script not configured"
+        fi
+
+  security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+
+    - name: Run Bandit security scan
+      run: |
+        bandit -r . -f json -o bandit-report.json --exclude './.venv,./venv,./node_modules' || true
+        bandit -r . -f screen --exclude './.venv,./venv,./node_modules' || true
+
+    - name: Run Safety check
+      run: |
+        pip install -r viewer/requirements.txt
+        safety check --json || true
+
+    - name: Upload security reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+        retention-days: 30

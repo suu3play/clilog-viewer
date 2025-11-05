@@ -1,0 +1,17 @@
+[MASTER]
+ignore=.git,.venv,venv,node_modules,__pycache__,.pytest_cache
+
+[MESSAGES CONTROL]
+disable=C0111,C0103,R0913,R0914,W0703,C0301
+
+[FORMAT]
+max-line-length=100
+indent-string='    '
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,id,db,f,e
+
+[DESIGN]
+max-args=7
+max-attributes=10
+max-locals=20
