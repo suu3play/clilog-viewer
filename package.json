@@ -1,63 +1,68 @@
 {
-    "name": "@suu3play/clilog-viewer",
-    "version": "2.0.1",
-    "description": "AI CLI conversation log converter and viewer with SQLite cache and real-time monitoring",
-    "main": "log_converter.py",
-    "scripts": {
-        "view": "cd viewer && python app.py",
-        "convert": "python log_converter.py",
-        "convert:force": "python log_converter.py --force",
-        "list": "python log_converter.py --list",
-        "build-cache": "cd viewer && python message_cache.py --build-cache",
-        "test": "npm run test:python && npm run test:js",
-        "test:python": "pytest tests/ -v --cov=. --cov-report=html --cov-report=term",
-        "test:js": "jest",
-        "test:e2e": "playwright test",
-        "test:all": "npm run test:python && npm run test:js && npm run test:e2e"
-    },
-    "keywords": [
-        "ai",
-        "cli",
-        "log",
-        "converter",
-        "viewer",
-        "markdown",
-        "chat",
-        "claude",
-        "github-copilot",
-        "chatgpt",
-        "sqlite",
-        "flask",
-        "realtime"
-    ],
-    "author": "suu3play",
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/suu3play/clilog-viewer.git"
-    },
-    "bugs": {
-        "url": "https://github.com/suu3play/clilog-viewer/issues"
-    },
-    "homepage": "https://github.com/suu3play/clilog-viewer#readme",
-    "engines": {
-        "python": ">=3.6"
-    },
-    "files": [
-        "log_converter.py",
-        "log_converter_config.ini",
-        "install_task_scheduler.bat",
-        "install_task_scheduler.ps1",
-        "uninstall_task_scheduler.bat",
-        "uninstall_task_scheduler.ps1",
-        "viewer/*.py",
-        "viewer/*.bat",
-        "viewer/*.txt",
-        "viewer/api/*.py",
-        "viewer/static/**/*",
-        "viewer/templates/**/*",
-        "README.md",
-        "CHANGELOG.md",
-        "LICENSE"
-    ]
+  "name": "@suu3play/clilog-viewer",
+  "version": "2.0.0",
+  "description": "AI CLI conversation log converter and viewer with SQLite cache and real-time monitoring",
+  "main": "log_converter.py",
+  "scripts": {
+    "start": "cd viewer && python app.py",
+    "convert": "python log_converter.py",
+    "convert:force": "python log_converter.py --force",
+    "list": "python log_converter.py --list",
+    "build-cache": "cd viewer && python message_cache.py --build-cache",
+    "test": "npm run test:python && npm run test:js",
+    "test:python": "pytest tests/ -v --cov=. --cov-report=html --cov-report=term",
+    "test:js": "jest",
+    "test:e2e": "playwright test",
+    "test:all": "npm run test:python && npm run test:js && npm run test:e2e",
+    "lint": "eslint viewer/static/js --ext .js",
+    "lint:fix": "eslint viewer/static/js --ext .js --fix",
+    "lint:python": "black --check . && flake8 .",
+    "format": "prettier --write viewer/static/js/**/*.js",
+    "format:python": "black . && isort ."
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "log",
+    "converter",
+    "viewer",
+    "markdown",
+    "chat",
+    "claude",
+    "github-copilot",
+    "chatgpt",
+    "sqlite",
+    "flask",
+    "realtime"
+  ],
+  "author": "suu3play",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/suu3play/clilog-viewer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/suu3play/clilog-viewer/issues"
+  },
+  "homepage": "https://github.com/suu3play/clilog-viewer#readme",
+  "engines": {
+    "python": ">=3.6"
+  },
+  "files": [
+    "log_converter.py",
+    "log_converter_config.ini",
+    "install_task_scheduler.bat",
+    "install_task_scheduler.ps1",
+    "uninstall_task_scheduler.bat",
+    "uninstall_task_scheduler.ps1",
+    "viewer/*.py",
+    "viewer/*.bat",
+    "viewer/*.txt",
+    "viewer/api/*.py",
+    "viewer/static/**/*",
+    "viewer/templates/**/*",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ]
 }

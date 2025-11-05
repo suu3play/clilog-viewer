@@ -873,9 +873,9 @@ class Config:
         """日付フィルタ設定を取得"""
         start_date = self.config.get('DEFAULT', 'date_start', fallback='')
         end_date = self.config.get('DEFAULT', 'date_end', fallback='')
-        
+
         if start_date or end_date:
-            return DateFilter(start_date or None, end_date or None)
+            return (start_date or None, end_date or None)
         return None
     
     def set_date_range(self, start_date, end_date):
