@@ -354,6 +354,102 @@ npm view @suu3play/clilog-viewer version
 npm update @suu3play/clilog-viewer
 ```
 
+## テスト
+
+### セットアップ
+
+#### Pythonテスト依存関係のインストール
+```bash
+pip install -r requirements-dev.txt
+```
+
+#### JavaScriptテスト依存関係のインストール
+```bash
+npm install --save-dev jest @testing-library/dom @playwright/test
+npx playwright install
+```
+
+### テスト実行
+
+#### Pythonユニットテスト
+```bash
+# テスト実行
+pytest tests/ -v
+
+# カバレッジレポート付き
+pytest tests/ -v --cov=. --cov-report=html --cov-report=term
+
+# または npm scripts
+npm run test:python
+```
+
+#### JavaScriptユニットテスト
+```bash
+# テスト実行
+jest
+
+# ウォッチモード
+jest --watch
+
+# カバレッジレポート付き
+jest --coverage
+
+# または npm scripts
+npm run test:js
+```
+
+#### E2Eテスト（Playwright）
+```bash
+# テスト実行
+npx playwright test
+
+# UIモード（デバッグ用）
+npx playwright test --ui
+
+# 特定のブラウザのみ
+npx playwright test --project=chromium
+
+# または npm scripts
+npm run test:e2e
+```
+
+#### すべてのテストを実行
+```bash
+npm run test:all
+```
+
+### テストカバレッジ
+
+テスト実行後、カバレッジレポートが生成されます：
+
+- **Pythonカバレッジ**: `htmlcov/index.html`
+- **JavaScriptカバレッジ**: `coverage/js/index.html`
+- **Playwrightレポート**: `playwright-report/index.html`
+
+### テスト構成
+
+```
+clilog-viewer/
+├── tests/                      # Pythonテスト
+│   ├── conftest.py            # pytest設定・共通fixture
+│   ├── unit/                  # ユニットテスト
+│   │   ├── test_log_converter.py
+│   │   ├── test_database.py
+│   │   └── ...
+│   └── fixtures/              # テストデータ
+│       └── sample.jsonl
+├── viewer/static/js/tests/    # JavaScriptテスト
+│   ├── api-client.test.js
+│   ├── virtual-scroller.test.js
+│   └── ...
+├── e2e/                       # E2Eテスト
+│   ├── viewer.spec.js
+│   └── realtime.spec.js
+├── pytest.ini                 # pytest設定
+├── jest.config.js            # Jest設定
+└── playwright.config.js      # Playwright設定
+```
+
 ## ライセンス
 
 MIT License
