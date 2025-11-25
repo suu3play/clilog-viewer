@@ -2,9 +2,11 @@
 viewer/api/validators.pyのユニットテスト
 入力検証ロジックのテスト
 """
-import pytest
-from pathlib import Path
+
 import sys
+from pathlib import Path
+
+import pytest
 
 # プロジェクトルートをパスに追加
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -26,7 +28,7 @@ class InputValidator:
         path = Path(file_path)
 
         # 相対パス記号の検出
-        if '..' in str(file_path):
+        if ".." in str(file_path):
             raise ValueError("Path traversal detected")
 
         # 絶対パスかどうか確認
@@ -84,17 +86,18 @@ class InputValidator:
         # HTMLエスケープ
         sanitized = (
             str(user_input)
-            .replace('&', '&amp;')
-            .replace('<', '&lt;')
-            .replace('>', '&gt;')
-            .replace('"', '&quot;')
-            .replace("'", '&#x27;')
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#x27;")
         )
 
         # 制御文字の除去（改行とタブは保持）
-        sanitized = ''.join(
-            char for char in sanitized
-            if char in ('\n', '\t') or (ord(char) >= 32 and ord(char) != 127)
+        sanitized = "".join(
+            char
+            for char in sanitized
+            if char in ("\n", "\t") or (ord(char) >= 32 and ord(char) != 127)
         )
 
         return sanitized
@@ -105,10 +108,10 @@ class TestInputValidator:
 
     def test_validate_file_path_valid_absolute(self):
         """有効な絶対パスの検証"""
-        if sys.platform == 'win32':
-            path = 'C:/Users/test/file.txt'
+        if sys.platform == "win32":
+            path = "C:/Users/test/file.txt"
         else:
-            path = '/home/test/file.txt'
+            path = "/home/test/file.txt"
 
         result = InputValidator.validate_file_path(path)
         assert result is not None
@@ -180,22 +183,22 @@ class TestInputValidator:
         """HTMLエスケープ"""
         user_input = '<script>alert("XSS")</script>'
         result = InputValidator.sanitize_input(user_input)
-        assert '&lt;script&gt;' in result
-        assert '&lt;/script&gt;' in result
-        assert '<script>' not in result
+        assert "&lt;script&gt;" in result
+        assert "&lt;/script&gt;" in result
+        assert "<script>" not in result
 
     def test_sanitize_input_quotes(self):
         """クォートのエスケープ"""
-        user_input = 'He said "Hello" and \'Hi\''
+        user_input = "He said \"Hello\" and 'Hi'"
         result = InputValidator.sanitize_input(user_input)
-        assert '&quot;' in result
-        assert '&#x27;' in result
+        assert "&quot;" in result
+        assert "&#x27;" in result
 
     def test_sanitize_input_ampersand(self):
         """アンパサンドのエスケープ"""
-        user_input = 'Tom & Jerry'
+        user_input = "Tom & Jerry"
         result = InputValidator.sanitize_input(user_input)
-        assert result == 'Tom &amp; Jerry'
+        assert result == "Tom &amp; Jerry"
 
     def test_sanitize_input_none(self):
         """None入力"""
@@ -204,25 +207,25 @@ class TestInputValidator:
 
     def test_sanitize_input_control_characters(self):
         """制御文字の除去"""
-        user_input = 'Hello\x00World\x01Test'
+        user_input = "Hello\x00World\x01Test"
         result = InputValidator.sanitize_input(user_input)
-        assert '\x00' not in result
-        assert '\x01' not in result
-        assert 'HelloWorldTest' in result
+        assert "\x00" not in result
+        assert "\x01" not in result
+        assert "HelloWorldTest" in result
 
     def test_sanitize_input_preserve_newline_tab(self):
         """改行とタブの保持"""
-        user_input = 'Line1\nLine2\tTab'
+        user_input = "Line1\nLine2\tTab"
         result = InputValidator.sanitize_input(user_input)
-        assert '\n' in result
-        assert '\t' in result
+        assert "\n" in result
+        assert "\t" in result
 
     def test_sanitize_input_unicode(self):
         """Unicode文字の処理"""
-        user_input = 'こんにちは 🚀'
+        user_input = "こんにちは 🚀"
         result = InputValidator.sanitize_input(user_input)
-        assert 'こんにちは' in result
-        assert '🚀' in result
+        assert "こんにちは" in result
+        assert "🚀" in result
 
     def test_validate_search_query_special_chars_allowed(self):
         """許可される特殊文字"""
@@ -239,7 +242,7 @@ class TestInputValidator:
         """複数のエスケープが必要な文字"""
         user_input = '<div class="test">&nbsp;</div>'
         result = InputValidator.sanitize_input(user_input)
-        assert '&lt;' in result
-        assert '&gt;' in result
-        assert '&quot;' in result
-        assert '&amp;' in result
+        assert "&lt;" in result
+        assert "&gt;" in result
+        assert "&quot;" in result
+        assert "&amp;" in result

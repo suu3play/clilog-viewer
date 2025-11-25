@@ -2,10 +2,12 @@
 pytest configuration file
 テスト全体で共有するfixtureを定義
 """
-import pytest
-import tempfile
+
 import os
+import tempfile
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture
@@ -24,7 +26,7 @@ def sample_jsonl_file(temp_dir):
 {"type":"message","role":"assistant","content":"I'm doing well, thank you!"}
 """
     file_path = temp_dir / "sample.jsonl"
-    file_path.write_text(jsonl_content, encoding='utf-8')
+    file_path.write_text(jsonl_content, encoding="utf-8")
     return file_path
 
 
@@ -39,5 +41,5 @@ output_folder = ./output
 force_update = False
 """
     config_path = temp_dir / "config.ini"
-    config_path.write_text(config_content, encoding='utf-8')
+    config_path.write_text(config_content, encoding="utf-8")
     return config_path

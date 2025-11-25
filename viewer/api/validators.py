@@ -2,12 +2,14 @@
 入力値の検証とサニタイズモジュール
 セキュリティ強化のための入力検証レイヤー
 """
+
 from datetime import datetime
 from typing import Optional, Tuple
 
 
 class ValidationError(Exception):
     """入力検証エラー"""
+
     pass
 
 
@@ -18,13 +20,10 @@ class InputValidator:
     MAX_LIMIT = 5000
     MAX_QUERY_LENGTH = 1000
     MAX_FILENAME_LENGTH = 500
-    DATE_FORMAT = '%Y-%m-%d'
+    DATE_FORMAT = "%Y-%m-%d"
 
     @staticmethod
-    def validate_and_sanitize_limit(
-        limit: int,
-        max_limit: int = MAX_LIMIT
-    ) -> int:
+    def validate_and_sanitize_limit(limit: int, max_limit: int = MAX_LIMIT) -> int:
         """
         limitパラメータの検証と制限
 
@@ -96,9 +95,9 @@ class InputValidator:
             )
 
         # LIKE特殊文字をエスケープ（バックスラッシュを先にエスケープ）
-        sanitized = query.replace('\\', '\\\\')  # \ → \\
-        sanitized = sanitized.replace('%', '\\%')  # % → \%
-        sanitized = sanitized.replace('_', '\\_')  # _ → \_
+        sanitized = query.replace("\\", "\\\\")  # \ → \\
+        sanitized = sanitized.replace("%", "\\%")  # % → \%
+        sanitized = sanitized.replace("_", "\\_")  # _ → \_
 
         return sanitized
 
@@ -126,7 +125,7 @@ class InputValidator:
             )
 
         # パストラバーサル文字列を除去
-        sanitized = filename.replace('..', '').replace('\\', '/').strip()
+        sanitized = filename.replace("..", "").replace("\\", "/").strip()
 
         if not sanitized:
             raise ValidationError("無効なファイル名です")

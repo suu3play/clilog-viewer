@@ -6,15 +6,16 @@
 """
 import sys
 from pathlib import Path
-from flask import Flask, render_template, jsonify, send_from_directory
-from flask_socketio import SocketIO
 
-# モジュールのインポート
-from config import AppConfig
 from api.database import DatabaseManager
 from api.routes_database import init_database_routes
 from api.routes_realtime import init_realtime_routes
 from api.websocket import init_websocket_handlers, websocket_callback
+
+# モジュールのインポート
+from config import AppConfig
+from flask import Flask, jsonify, render_template, send_from_directory
+from flask_socketio import SocketIO
 
 # リアルタイム機能のインポート
 sys.path.append(str(Path(__file__).parent.parent))
@@ -31,7 +32,7 @@ except ImportError as e:
 
 # Flask application initialization
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'clilog-viewer-secret-key'
+app.config["SECRET_KEY"] = "clilog-viewer-secret-key"
 
 # SocketIO initialization
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -67,54 +68,41 @@ if realtime_manager:
 init_websocket_handlers(socketio, realtime_manager)
 
 
-@app.route('/')
+@app.route("/")
 def index():
     """Main page"""
-    return render_template('index.html')
+    return render_template("index.html")
 
 
-@app.route('/api/config')
+@app.route("/api/config")
 def get_config():
     """Get application configuration"""
     try:
-        return jsonify({
-            'success': True,
-            'config': {
-                'default_display_mode': config.get_default_display_mode()
-            }
-        })
+        return jsonify(
+            {"success": True, "config": {"default_display_mode": config.get_default_display_mode()}}
+        )
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'config': {
-                'default_display_mode': 'database'
-            }
-        })
+        return jsonify(
+            {"success": False, "error": str(e), "config": {"default_display_mode": "database"}}
+        )
 
 
-@app.route('/static/<path:filename>')
+@app.route("/static/<path:filename>")
 def serve_static(filename):
     """Serve static files"""
-    return send_from_directory('static', filename)
+    return send_from_directory("static", filename)
 
 
 @app.errorhandler(404)
 def not_found(error):
     """404 error handler"""
-    return jsonify({
-        'success': False,
-        'error': 'Endpoint not found'
-    }), 404
+    return jsonify({"success": False, "error": "Endpoint not found"}), 404
 
 
 @app.errorhandler(500)
 def internal_error(error):
     """500 error handler"""
-    return jsonify({
-        'success': False,
-        'error': 'Internal server error'
-    }), 500
+    return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 def init_app():
@@ -134,7 +122,7 @@ def init_app():
             print("Database file not found. Please run log_converter.py")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     init_app()
 
     print("CliLog Viewer + Realtime features starting...")
@@ -150,26 +138,15 @@ if __name__ == '__main__':
     try:
         socketio.run(
             app,
-            host='0.0.0.0',
+            host="0.0.0.0",
             port=5000,
             debug=False,
             use_reloader=False,
-            allow_unsafe_werkzeug=True
+            allow_unsafe_werkzeug=True,
         )
     except TypeError as e:
-        if 'allow_unsafe_werkzeug' in str(e):
-            socketio.run(
-                app,
-                host='0.0.0.0',
-                port=5000,
-                debug=False,
-                use_reloader=False
-            )
+        if "allow_unsafe_werkzeug" in str(e):
+            socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False)
         else:
             print("SocketIO startup error, using standard Flask server")
-            app.run(
-                host='0.0.0.0',
-                port=5000,
-                debug=False,
-                use_reloader=False
-            )
+            app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)

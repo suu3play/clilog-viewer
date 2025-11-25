@@ -60,8 +60,7 @@ class ConnectionError(DatabaseError):
             message: 内部ログ用のメッセージ（接続情報を含む）
         """
         super().__init__(
-            message,
-            "データベース接続エラーが発生しました。しばらくしてから再度お試しください"
+            message, "データベース接続エラーが発生しました。しばらくしてから再度お試しください"
         )
 
 
@@ -82,7 +81,4 @@ class QueryError(DatabaseError):
             query_type: クエリの種類（ログ出力用）
         """
         self.query_type = query_type
-        super().__init__(
-            message,
-            "データ取得中にエラーが発生しました"
-        )
+        super().__init__(message, "データ取得中にエラーが発生しました")
