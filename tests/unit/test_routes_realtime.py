@@ -177,9 +177,9 @@ class TestRealtimeRoutes:
         # 初期サイズを記録
         initial_size = temp_log_file.stat().st_size
 
-        # ファイルを切り詰め
+        # ファイルを切り詰め（初期サイズより小さい内容で上書き）
         with open(temp_log_file, 'w', encoding='utf-8') as f:
-            f.write('{"type":"message","role":"user","content":"Truncated"}\n')
+            f.write('{"type":"message","role":"user","content":"Hi"}\n')
 
         # サイズが変わったことを確認
         new_size = temp_log_file.stat().st_size
