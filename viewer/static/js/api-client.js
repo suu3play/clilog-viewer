@@ -141,7 +141,6 @@ class ApiClient {
 
             // キャッシュフォールバック
             if (this.cache.has(cacheKey)) {
-                console.log('統計情報のキャッシュを使用');
                 const cachedData = this.cache.get(cacheKey);
                 // キャッシュデータに警告フラグを追加
                 return {

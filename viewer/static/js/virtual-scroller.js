@@ -299,8 +299,6 @@ window.copyToClipboard = function (button) {
         .replace(/&gt;/g, '>')
         .replace(/&amp;/g, '&');
 
-    console.log('コピー対象コード:', decodedCode);
-
     navigator.clipboard
         .writeText(decodedCode)
         .then(() => {

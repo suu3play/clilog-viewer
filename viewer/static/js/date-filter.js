@@ -46,11 +46,9 @@ class DateFilter {
             const response = await fetch(
                 `/api/search/date-range?start_date=${startDate}&end_date=${endDate}&limit=5000`
             );
-            console.log(
                 '🚀 ~ DateFilter ~ loadMessagesByDateRange ~ endDate:',
                 endDate
             );
-            console.log(
                 '🚀 ~ DateFilter ~ loadMessagesByDateRange ~ startDate:',
                 startDate
             );
@@ -83,7 +81,6 @@ class DateFilter {
      */
     async loadAllMessages() {
         try {
-            console.log('loadAllMessages() が呼び出されました');
             this.uiStateManager.showLoading('すべてのメッセージを読み込み中...');
 
             // まず利用可能な日付範囲を取得（キャッシュを使用しない）
@@ -105,9 +102,7 @@ class DateFilter {
                 `/api/search/date-range?start_date=${dateRangeData.min_date}&end_date=${dateRangeData.max_date}&limit=5000`,
                 { cache: 'no-store' }
             );
-            console.log('API response received:', response.status);
             const data = await response.json();
-            console.log('API data parsed:', data.success, 'total:', data.total);
 
             if (data.success) {
                 this.messageDisplay.displayMessages(data.results);
@@ -159,7 +154,6 @@ class DateFilter {
                 // 初期表示: 全ログを読み込む
                 await this.loadAllMessages();
 
-                console.log(
                     `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
                 );
             }
@@ -188,7 +182,6 @@ class DateFilter {
                 this.elements.endDate.value = endDateStr;
             }
 
-            console.log(`初期日付範囲設定: ${startDateStr} 〜 ${endDateStr}`);
 
             // 初期表示で直近1週間のメッセージを表示
             this.loadMessagesByDateRange(startDateStr, endDateStr);

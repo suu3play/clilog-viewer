@@ -19,13 +19,11 @@ class UIManager {
     }
 
     init() {
-        console.log('UIManager.init() 開始');
         this.cacheElements();
         this.bindEvents();
         this.loadTheme();
         this.updateStats();
         this.setDateRangeRestrictions(); // この中で直近1週間の表示が実行される
-        console.log('UIManager.init() 完了');
     }
 
     cacheElements() {
@@ -177,11 +175,9 @@ class UIManager {
             const response = await fetch(
                 `/api/search/date-range?start_date=${startDate}&end_date=${endDate}&limit=5000`
             );
-            console.log(
                 '🚀 ~ UIManager ~ loadMessagesByDateRange ~ endDate:',
                 endDate
             );
-            console.log(
                 '🚀 ~ UIManager ~ loadMessagesByDateRange ~ startDate:',
                 startDate
             );
@@ -535,7 +531,6 @@ class UIManager {
     // 全メッセージ表示
     async loadAllMessages() {
         try {
-            console.log('loadAllMessages() が呼び出されました');
             this.showLoading('すべてのメッセージを読み込み中...');
 
             // まず利用可能な日付範囲を取得
@@ -554,9 +549,7 @@ class UIManager {
             const response = await fetch(
                 `/api/search/date-range?start_date=${dateRangeData.min_date}&end_date=${dateRangeData.max_date}&limit=5000`
             );
-            console.log('API response received:', response.status);
             const data = await response.json();
-            console.log('API data parsed:', data.success, 'total:', data.total);
 
             if (data.success) {
                 this.displayMessages(data.results);
@@ -654,7 +647,6 @@ class UIManager {
                 // 初期表示: 全ログを読み込む
                 this.loadAllMessages();
 
-                console.log(
                     `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
                 );
             }
@@ -680,7 +672,6 @@ class UIManager {
                 this.elements.endDate.value = endDateStr;
             }
 
-            console.log(`初期日付範囲設定: ${startDateStr} 〜 ${endDateStr}`);
 
             // 初期表示で直近1週間のメッセージを表示
             this.loadMessagesByDateRange(startDateStr, endDateStr);

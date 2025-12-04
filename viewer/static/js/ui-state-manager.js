@@ -24,7 +24,6 @@ class UIStateManager {
     }
 
     init() {
-        console.log('UIStateManager.init() 開始');
         this.cacheElements();
         this.initializeModules();
         this.bindEvents();
@@ -36,7 +35,6 @@ class UIStateManager {
             this.dateFilter.setDateRangeRestrictions();
         }
 
-        console.log('UIStateManager.init() 完了');
     }
 
     cacheElements() {
