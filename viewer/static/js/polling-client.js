@@ -75,7 +75,6 @@ class PollingClient {
     async startPolling() {
         if (this.isActive) return;
 
-        console.log('ポーリング開始');
         this.isActive = true;
         this.retryCount = 0;
         this.updateStatus('ポーリング開始中...', 'loading');
@@ -101,7 +100,6 @@ class PollingClient {
             this.scheduleNextPoll();
             this.updateStatus('ポーリング中', 'success');
 
-            console.log(`ポーリング開始完了 (間隔: ${this.pollingInterval / 1000}秒)`);
 
         } catch (error) {
             console.error('ポーリング開始エラー:', error);
@@ -115,7 +113,6 @@ class PollingClient {
     stopPolling() {
         if (!this.isActive) return;
 
-        console.log('ポーリング停止');
         this.isActive = false;
 
         if (this.intervalId) {
@@ -124,13 +121,11 @@ class PollingClient {
         }
 
         this.updateStatus('停止中', 'warning');
-        console.log('ポーリング停止完了');
     }
 
     restartPolling() {
         if (!this.isActive) return;
 
-        console.log('ポーリング再開');
         if (this.intervalId) {
             clearTimeout(this.intervalId);
         }
@@ -276,7 +271,6 @@ class PollingClient {
 
             if (data.success) {
                 this.populateFileDropdown(data.files);
-                console.log(`ファイル一覧更新: ${data.files.length}件`);
             } else {
                 throw new Error(data.error || 'ファイル一覧の取得に失敗');
             }
@@ -329,7 +323,6 @@ class PollingClient {
                     this.updateLoadTime();
                 }
 
-                console.log(`最新ファイル選択: ${data.file_info.name}`);
             }
 
         } catch (error) {
@@ -374,7 +367,6 @@ class PollingClient {
                     this.lastTimestamp = null;
                 }
 
-                console.log(`ファイル選択: ${fileName} (${data.messages.length}件)`);
                 this.updateStatus(`選択: ${fileName}`, 'success');
             } else {
                 throw new Error(data.error || 'ファイルの読み込みに失敗');
@@ -534,7 +526,6 @@ class PollingClient {
         if (window.uiManager && typeof window.uiManager.showNotification === 'function') {
             window.uiManager.showNotification(message, type);
         } else {
-            console.log(`通知 [${type}]: ${message}`);
         }
     }
 

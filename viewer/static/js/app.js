@@ -16,14 +16,9 @@ class ChatLogApp {
     }
     
     async init() {
-        console.log('CliLog Viewer 起動中...');
-
         try {
             // API進捗表示を設定
             this.apiClient.onProgress(({ message, percent }) => {
-                if (message) {
-                    console.log('API Progress:', message);
-                }
                 if (percent !== null) {
                     this.updateProgressBar(percent);
                 }
@@ -41,8 +36,6 @@ class ChatLogApp {
             // 定期的な統計更新
             this.startStatsUpdateTimer();
 
-            console.log('アプリケーション初期化完了');
-
         } catch (error) {
             console.error('アプリケーション初期化エラー:', error);
             this.uiManager.showNotification('アプリケーションの初期化に失敗しました', 'error');
@@ -56,7 +49,6 @@ class ChatLogApp {
 
             if (data.success && data.config) {
                 const defaultMode = data.config.default_display_mode || 'database';
-                console.log(`設定から初期表示モード取得: ${defaultMode}`);
 
                 // リアルタイムクライアントが存在する場合、初期モードを設定
                 if (window.realtimeClient) {
@@ -80,22 +72,19 @@ class ChatLogApp {
     async loadInitialData() {
         // 統計情報を読み込み
         await this.updateStats();
-        
+
         // UIManagerはすでに初期化時にloadAllMessages()を呼び出すので、ここでは何もしない
-        console.log('初期データ読み込み完了');
     }
     
     async updateStats() {
         // 重複実行を防止
         if (this.statsUpdateInProgress) {
-            console.log('統計更新が既に進行中のためスキップ');
             return;
         }
 
         this.statsUpdateInProgress = true;
 
         try {
-            console.log('統計情報更新開始');
             const data = await this.apiClient.getStats();
 
             if (data && data.success && data.stats) {
@@ -105,7 +94,6 @@ class ChatLogApp {
                 if (this.uiManager && this.uiManager.elements && this.uiManager.elements.cacheStatus) {
                     this.uiManager.elements.cacheStatus.textContent =
                         `キャッシュ: ${stats.cached_files}ファイル (${stats.cache_size_mb.toFixed(1)}MB)`;
-                    console.log(`統計更新成功: ${stats.cached_files}ファイル, ${stats.total_messages}メッセージ`);
                 } else {
                     console.warn('UI要素が見つからないため統計表示をスキップ');
                 }
@@ -150,18 +138,14 @@ class ChatLogApp {
 
         // 30秒ごとに統計更新
         this.statsUpdateTimer = setInterval(() => {
-            console.log('定期統計更新実行');
             this.updateStats();
         }, 30000);
-
-        console.log('統計更新タイマー開始（30秒間隔）');
     }
 
     stopStatsUpdateTimer() {
         if (this.statsUpdateTimer) {
             clearInterval(this.statsUpdateTimer);
             this.statsUpdateTimer = null;
-            console.log('統計更新タイマー停止');
         }
     }
     
@@ -195,11 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/static/sw.js')
-            .then(registration => {
-                console.log('Service Worker 登録成功:', registration.scope);
-            })
             .catch(error => {
-                console.log('Service Worker 登録失敗:', error);
+                console.error('Service Worker 登録失敗:', error);
             });
     });
 }

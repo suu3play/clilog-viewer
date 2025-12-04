@@ -15,7 +15,6 @@ class CopyUtils {
             // Clipboard API を使用（モダンブラウザ）
             if (navigator.clipboard && window.isSecureContext) {
                 await navigator.clipboard.writeText(text);
-                console.log('テキストをクリップボードにコピーしました:', text.substring(0, 50) + '...');
 
                 if (button) {
                     CopyUtils.showCopyFeedback(button, true);
@@ -62,7 +61,6 @@ class CopyUtils {
             document.body.removeChild(textArea);
 
             if (successful) {
-                console.log('フォールバック方式でコピー成功');
                 if (button) {
                     CopyUtils.showCopyFeedback(button, true);
                 }

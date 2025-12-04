@@ -44,7 +44,6 @@ class RealtimeClient {
     }
 
     switchMode(mode) {
-        console.log(`モード切り替え: ${this.currentMode} → ${mode}`);
         
         this.currentMode = mode;
         
@@ -101,7 +100,6 @@ class RealtimeClient {
     }
 
     async initializeRealtimeMode() {
-        console.log('リアルタイムモード初期化開始');
 
         try {
             // WebSocket接続
@@ -118,7 +116,6 @@ class RealtimeClient {
     }
 
     async initializeDatabaseMode() {
-        console.log('データベースモード初期化');
 
         // WebSocket切断
         this.disconnectWebSocket();
@@ -149,7 +146,6 @@ class RealtimeClient {
 
                 // 接続成功
                 this.socket.on('connect', () => {
-                    console.log('WebSocket接続成功');
                     this.isConnected = true;
                     this.updateStatus('接続済み', 'success');
                     resolve();
@@ -165,7 +161,6 @@ class RealtimeClient {
 
                 // 切断
                 this.socket.on('disconnect', () => {
-                    console.log('WebSocket切断');
                     this.isConnected = false;
                     this.updateStatus('切断', 'warning');
                 });
@@ -177,7 +172,6 @@ class RealtimeClient {
 
                 // サーバーからの通知
                 this.socket.on('connected', (data) => {
-                    console.log('サーバー通知:', data);
                 });
 
                 // エラー通知
@@ -219,7 +213,6 @@ class RealtimeClient {
                 this.selectedFile = data.file_info;
                 this.displayMessages(data.messages);
 
-                console.log(`最新ファイル読み込み完了: ${data.file_info.name} (${data.messages.length}件)`);
                 this.updateStatus(`最新: ${data.file_info.name}`, 'success');
             } else {
                 throw new Error(data.error || '最新ファイルの読み込みに失敗');
@@ -320,7 +313,6 @@ class RealtimeClient {
     }
 
     handleFileUpdate(data) {
-        console.log('ファイル更新通知:', data);
 
         if (!this.selectedFile || data.file_path !== this.selectedFile.path) {
             return; // 現在選択中のファイルではない
@@ -393,7 +385,6 @@ class RealtimeClient {
         if (window.uiManager && typeof window.uiManager.showNotification === 'function') {
             window.uiManager.showNotification(message, type);
         } else {
-            console.log(`通知 [${type}]: ${message}`);
         }
     }
 
@@ -420,7 +411,6 @@ class RealtimeClient {
 
     toggleAutoScroll() {
         this.autoScroll = !this.autoScroll;
-        console.log(`自動スクロール: ${this.autoScroll ? 'ON' : 'OFF'}`);
         return this.autoScroll;
     }
 
@@ -428,7 +418,6 @@ class RealtimeClient {
     async setDefaultDateRange() {
         // UIManagerの全ログ読み込み機能を利用
         if (window.uiManager && typeof window.uiManager.loadAllMessages === 'function') {
-            console.log('データベースモード: 全ログを読み込み');
             await window.uiManager.loadAllMessages();
         } else {
             console.warn('UIManagerの全ログ読み込み機能が利用できません');
@@ -440,7 +429,6 @@ class RealtimeClient {
         if (window.uiManager && typeof window.uiManager.loadMessagesByDateRange === 'function') {
             // 少し遅延させてDOM更新を確実にする
             setTimeout(() => {
-                console.log(`自動日付検索実行: ${startDate} 〜 ${endDate}`);
                 window.uiManager.loadMessagesByDateRange(startDate, endDate);
                 this.showNotification(`直近1週間の会話を読み込みました (${startDate} 〜 ${endDate})`, 'success');
             }, 100);
