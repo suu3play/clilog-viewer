@@ -16,7 +16,7 @@ class MessageRenderer {
         const {
             useDetailedFormat = false,
             showHashPrefix = false,
-            enableMarkdown = false,
+            enableMarkdown = false
         } = options;
 
         const div = document.createElement('div');
@@ -26,24 +26,24 @@ class MessageRenderer {
         const timestamp = useDetailedFormat
             ? window.DateFormatter
                 ? window.DateFormatter.format(message.timestamp, {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit',
-                  })
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                })
                 : new Date(message.timestamp).toLocaleString('ja-JP', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit',
-                  })
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                })
             : window.DateFormatter
-            ? window.DateFormatter.formatSimple(message.timestamp)
-            : new Date(message.timestamp).toLocaleString('ja-JP');
+                ? window.DateFormatter.formatSimple(message.timestamp)
+                : new Date(message.timestamp).toLocaleString('ja-JP');
 
         // アイコンとロール名
         const avatarIcon = message.role === 'user' ? '👤' : '🤖';

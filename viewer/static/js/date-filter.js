@@ -46,19 +46,13 @@ class DateFilter {
             const response = await fetch(
                 `/api/search/date-range?start_date=${startDate}&end_date=${endDate}&limit=5000`
             );
-                '🚀 ~ DateFilter ~ loadMessagesByDateRange ~ endDate:',
-                endDate
-            );
-                '🚀 ~ DateFilter ~ loadMessagesByDateRange ~ startDate:',
-                startDate
-            );
             const data = await response.json();
 
             if (data.success) {
                 this.messageDisplay.displayMessages(data.results);
                 this.uiStateManager.updateStats({
                     messageCount: data.total,
-                    dateRange: `${startDate} 〜 ${endDate}`,
+                    dateRange: `${startDate} 〜 ${endDate}`
                 });
                 this.uiStateManager.showNotification(
                     `${data.total}件のメッセージを表示しました`,
@@ -108,7 +102,7 @@ class DateFilter {
                 this.messageDisplay.displayMessages(data.results);
                 this.uiStateManager.updateStats({
                     messageCount: data.total,
-                    dateRange: 'すべて',
+                    dateRange: 'すべて'
                 });
                 this.uiStateManager.showNotification(
                     `${data.total}件のメッセージを表示しました`,
@@ -153,9 +147,6 @@ class DateFilter {
 
                 // 初期表示: 全ログを読み込む
                 await this.loadAllMessages();
-
-                    `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
-                );
             }
         } catch (error) {
             console.warn('日付範囲制限の設定に失敗:', error);

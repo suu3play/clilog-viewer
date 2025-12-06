@@ -3,6 +3,7 @@
  * 大量のメッセージを効率的に描画
  */
 
+// eslint-disable-next-line no-unused-vars
 class VirtualScroller {
     constructor(container, options = {}) {
         this.container = container;
@@ -177,7 +178,7 @@ class VirtualScroller {
         );
     }
 
-    processToolUse(content, toolName) {
+    processToolUse(content) {
         // ツール使用ブロックを展開可能にする
         const match = content.match(
             /\[ツール使用:\s*([^\]]+)\]\n```json\n([\s\S]*?)\n```/
@@ -194,8 +195,8 @@ class VirtualScroller {
                     </div>
                     <div class="tool-details">
                         <pre class="json-content">${this.escapeHtml(
-                            jsonData
-                        )}</pre>
+        jsonData
+    )}</pre>
                     </div>
                 </div>
             `
@@ -218,7 +219,7 @@ class VirtualScroller {
             user: '👤',
             assistant: '🤖',
             system: '⚙️',
-            summary: '📋',
+            summary: '📋'
         };
         return icons[role] || '💬';
     }
@@ -228,7 +229,7 @@ class VirtualScroller {
             user: 'ユーザー',
             assistant: 'アシスタント',
             system: 'システム',
-            summary: 'サマリー',
+            summary: 'サマリー'
         };
         return names[role] || role;
     }
@@ -277,7 +278,7 @@ class VirtualScroller {
         const targetScrollTop = index * this.itemHeight;
         this.container.scrollTo({
             top: targetScrollTop,
-            behavior: 'smooth',
+            behavior: 'smooth'
         });
     }
 

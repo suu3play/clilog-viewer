@@ -165,7 +165,7 @@ class ApiClient {
         }
     }
     
-    clearCache() {
+    clearLocalCache() {
         this.cache.clear();
     }
 }

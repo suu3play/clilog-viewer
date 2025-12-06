@@ -18,7 +18,7 @@ class ChatLogApp {
     async init() {
         try {
             // API進捗表示を設定
-            this.apiClient.onProgress(({ message, percent }) => {
+            this.apiClient.onProgress(({ percent }) => {
                 if (percent !== null) {
                     this.updateProgressBar(percent);
                 }

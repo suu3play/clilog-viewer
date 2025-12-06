@@ -64,5 +64,8 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "eslint": "^8.57.1"
+  }
 }
