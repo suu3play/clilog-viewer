@@ -41,7 +41,7 @@ class SearchManager {
                 this.displaySearchResults(data.results, query);
                 this.uiStateManager.updateStats({
                     messageCount: data.total,
-                    dateRange: `検索: "${query}"`,
+                    dateRange: `検索: "${query}"`
                 });
                 this.uiStateManager.showNotification(
                     `"${query}"の検索結果: ${data.total}件`,

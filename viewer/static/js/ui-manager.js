@@ -12,7 +12,7 @@ class UIManager {
             sidebarOpen: true,
             searchMode: false,
             currentWeekStart: new Date(),
-            selectedDate: null,
+            selectedDate: null
         };
 
         this.init();
@@ -70,7 +70,7 @@ class UIManager {
             modalClose: document.getElementById('modalClose'),
 
             // 通知
-            notifications: document.getElementById('notifications'),
+            notifications: document.getElementById('notifications')
         };
     }
 
@@ -175,19 +175,13 @@ class UIManager {
             const response = await fetch(
                 `/api/search/date-range?start_date=${startDate}&end_date=${endDate}&limit=5000`
             );
-                '🚀 ~ UIManager ~ loadMessagesByDateRange ~ endDate:',
-                endDate
-            );
-                '🚀 ~ UIManager ~ loadMessagesByDateRange ~ startDate:',
-                startDate
-            );
             const data = await response.json();
 
             if (data.success) {
                 this.displayMessages(data.results);
                 this.updateStats({
                     messageCount: data.total,
-                    dateRange: `${startDate} 〜 ${endDate}`,
+                    dateRange: `${startDate} 〜 ${endDate}`
                 });
                 this.showNotification(
                     `${data.total}件のメッセージを表示しました`,
@@ -291,10 +285,10 @@ class UIManager {
             const messageNumber = index + 1;
             const messageElement = window.MessageRenderer
                 ? window.MessageRenderer.createMessageElement(message, messageNumber, {
-                      useDetailedFormat: true,
-                      showHashPrefix: true,
-                      enableMarkdown: false,
-                  })
+                    useDetailedFormat: true,
+                    showHashPrefix: true,
+                    enableMarkdown: false
+                })
                 : this.createFallbackMessageElement(message, messageNumber);
 
             chatContainer.appendChild(messageElement);
@@ -362,7 +356,7 @@ class UIManager {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
-                weekday: 'long',
+                weekday: 'long'
             });
         } catch (e) {
             return dateStr;
@@ -383,7 +377,7 @@ class UIManager {
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit',
+            second: '2-digit'
         });
 
         const icon = message.role === 'user' ? '👤' : '🤖';
@@ -555,7 +549,7 @@ class UIManager {
                 this.displayMessages(data.results);
                 this.updateStats({
                     messageCount: data.total,
-                    dateRange: 'すべて',
+                    dateRange: 'すべて'
                 });
                 this.showNotification(
                     `${data.total}件のメッセージを表示しました`,
@@ -600,7 +594,7 @@ class UIManager {
                 this.displaySearchResults(data.results, query);
                 this.updateStats({
                     messageCount: data.total,
-                    dateRange: `検索: "${query}"`,
+                    dateRange: `検索: "${query}"`
                 });
                 this.showNotification(
                     `"${query}"の検索結果: ${data.total}件`,
@@ -646,9 +640,6 @@ class UIManager {
 
                 // 初期表示: 全ログを読み込む
                 this.loadAllMessages();
-
-                    `日付範囲制限設定: ${data.min_date} 〜 ${data.max_date}`
-                );
             }
         } catch (error) {
             console.warn('日付範囲制限の設定に失敗:', error);

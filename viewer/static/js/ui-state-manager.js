@@ -12,7 +12,7 @@ class UIStateManager {
             sidebarOpen: true,
             searchMode: false,
             currentWeekStart: new Date(),
-            selectedDate: null,
+            selectedDate: null
         };
 
         // 依存モジュールのインスタンス
@@ -79,7 +79,7 @@ class UIStateManager {
             modalClose: document.getElementById('modalClose'),
 
             // 通知
-            notifications: document.getElementById('notifications'),
+            notifications: document.getElementById('notifications')
         };
     }
 
@@ -324,7 +324,7 @@ class UIStateManager {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
-                weekday: 'long',
+                weekday: 'long'
             });
         } catch (e) {
             return dateStr;

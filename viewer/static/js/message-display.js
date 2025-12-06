@@ -44,10 +44,10 @@ class MessageDisplay {
             const messageNumber = index + 1;
             const messageElement = window.MessageRenderer
                 ? window.MessageRenderer.createMessageElement(message, messageNumber, {
-                      useDetailedFormat: true,
-                      showHashPrefix: true,
-                      enableMarkdown: false,
-                  })
+                    useDetailedFormat: true,
+                    showHashPrefix: true,
+                    enableMarkdown: false
+                })
                 : this.createFallbackMessageElement(message, messageNumber);
 
             chatContainer.appendChild(messageElement);
@@ -130,7 +130,7 @@ class MessageDisplay {
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit',
+            second: '2-digit'
         });
 
         const icon = message.role === 'user' ? '👤' : '🤖';

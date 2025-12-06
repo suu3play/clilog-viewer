@@ -171,7 +171,7 @@ class RealtimeClient {
                 });
 
                 // サーバーからの通知
-                this.socket.on('connected', (data) => {
+                this.socket.on('connected', () => {
                 });
 
                 // エラー通知
@@ -268,7 +268,7 @@ class RealtimeClient {
             return window.MessageRenderer.createMessageElement(message, messageNumber, {
                 useDetailedFormat: false,
                 showHashPrefix: false,
-                enableMarkdown: true,
+                enableMarkdown: true
             });
         }
 
@@ -384,7 +384,6 @@ class RealtimeClient {
         // UIManagerの通知機能を使用
         if (window.uiManager && typeof window.uiManager.showNotification === 'function') {
             window.uiManager.showNotification(message, type);
-        } else {
         }
     }
 

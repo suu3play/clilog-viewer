@@ -144,7 +144,6 @@ class PollingClient {
         if (!this.isActive) return;
 
         try {
-            let response;
             let url;
 
             if (this.currentFile) {
@@ -155,13 +154,13 @@ class PollingClient {
                 }
             } else {
                 // 最新ファイルをポーリング
-                url = `/api/polling/latest?limit=20`;
+                url = '/api/polling/latest?limit=20';
                 if (this.lastTimestamp) {
                     url += `&since=${encodeURIComponent(this.lastTimestamp)}`;
                 }
             }
 
-            response = await fetch(url);
+            const response = await fetch(url);
             const data = await response.json();
 
             if (!data.success) {
@@ -422,7 +421,7 @@ class PollingClient {
     appendMessages(messages) {
         if (!this.elements.messageArea || !messages || messages.length === 0) return;
 
-        let container = this.elements.messageArea.querySelector('.chat-container');
+        const container = this.elements.messageArea.querySelector('.chat-container');
         if (!container) {
             // コンテナが存在しない場合は新規作成
             this.displayMessages(messages);
@@ -453,7 +452,7 @@ class PollingClient {
             return window.MessageRenderer.createMessageElement(message, messageNumber, {
                 useDetailedFormat: false,
                 showHashPrefix: false,
-                enableMarkdown: true,
+                enableMarkdown: true
             });
         }
 
@@ -525,7 +524,6 @@ class PollingClient {
         // UIManagerの通知機能を使用
         if (window.uiManager && typeof window.uiManager.showNotification === 'function') {
             window.uiManager.showNotification(message, type);
-        } else {
         }
     }
 
