@@ -31,3 +31,5 @@ viewer/cache/*.db-*
 *.log
 *.db
 *.tgz
+
+node_modules/
